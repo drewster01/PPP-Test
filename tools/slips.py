@@ -32,7 +32,8 @@ def legs() -> list[dict]:
                 continue
             out.append({"league": lg, "player": l["player"], "team": l.get("team"), "stat": l["stat"],
                         "side": l["side"], "line": l["current_line"], "p": l["model_conf"] / 100,
-                        "factor": config.ADJUSTED_LEG_FACTOR if l.get("reduced_payout") else 1.0,
+                        # reduced-payout legs are not marked down (user choice; the cut is unmeasured)
+                        "factor": 1.0,
                         "edge": l["edge"]})
     return sorted(out, key=lambda x: -x["edge"])[:MAX_POOL]
 

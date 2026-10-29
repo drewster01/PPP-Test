@@ -183,10 +183,12 @@ BREAKEVEN = 54.2  # per-pick hit rate a 5 or 6-pick Flex needs at full payout
 
 def breakeven(reduced: bool) -> float:
     """Per-leg hit rate a 6-pick Flex needs (54.2% at full payout); reduced legs pay ~12% less."""
-    return BREAKEVEN / (REDUCED_FACTOR if reduced else 1.0)
+    return BREAKEVEN / (REDUCED_FACTOR if reduced and PENALIZE_REDUCED else 1.0)
 
 
 REDUCED_FACTOR = (15 / 25) ** (1 / 4)  # same as ppedge.config.ADJUSTED_LEG_FACTOR
+# User choice (10/29): rank reduced-payout legs like full ones; the payout cut is an unmeasured estimate
+PENALIZE_REDUCED = False
 MARKET_WEIGHT = 0.75
 # SPY audit 10/29 (128 lines vs Pinnacle): the market keeps almost none of the model's deviation on
 # points and PRA, more on threes and assists. Weight on the market, by stat:
