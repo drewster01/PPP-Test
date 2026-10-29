@@ -173,17 +173,27 @@ const usd = v => "$" + v.toLocaleString(undefined, { minimumFractionDigits: 2, m
 const LS = (k, v) => { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (e) { return null; } };
 let board = null;
 const NARR = false;
-// /<league>/<page>: league is nba or nfl, page is picks, leans or results
-const [, LEAGUE_PATH = "nba", PAGE = "picks"] = location.pathname.split("/");
-const PLATFORM = PAGE === "leans" ? "leans" : PAGE === "results" ? "results" : "mores";
-const BOARD_URL = `/${LEAGUE_PATH}/${PLATFORM === "mores" ? "board.json" : `board_${PLATFORM}.json`}`;
-const PP_LIKE = PLATFORM === "mores";
-document.querySelectorAll("#tabs a").forEach(a => { a.href = `/${LEAGUE_PATH}/${a.dataset.p}`; a.classList.toggle("on", a.dataset.p === PAGE); });
-document.querySelectorAll("#leagues a").forEach(a => { a.href = `/${a.dataset.l}/${PAGE}`; a.classList.toggle("on", a.dataset.l === LEAGUE_PATH); });
+// Phone snapshot (tools/export_static.py): boards are embedded in the page and the view lives in the hash
+const STATIC = window.STATIC_BOARDS || null;
+let LEAGUE_PATH, PAGE, PLATFORM, BOARD_URL, PP_LIKE;
+// /<league>/<page> (or #<league>-<page> in the snapshot): league is nba or nfl, page is picks, leans or results
+function route() {
+  const parts = STATIC ? location.hash.slice(1).split("-") : location.pathname.split("/").slice(1);
+  LEAGUE_PATH = parts[0] || "nba";
+  PAGE = parts[1] || "picks";
+  PLATFORM = PAGE === "leans" ? "leans" : PAGE === "results" ? "results" : "mores";
+  BOARD_URL = `/${LEAGUE_PATH}/${PLATFORM === "mores" ? "board.json" : `board_${PLATFORM}.json`}`;
+  PP_LIKE = PLATFORM === "mores";
+  const href = (l, pg) => STATIC ? `#${l}-${pg}` : `/${l}/${pg}`;
+  document.querySelectorAll("#tabs a").forEach(a => { a.href = href(LEAGUE_PATH, a.dataset.p); a.classList.toggle("on", a.dataset.p === PAGE); });
+  document.querySelectorAll("#leagues a").forEach(a => { a.href = href(a.dataset.l, PAGE); a.classList.toggle("on", a.dataset.l === LEAGUE_PATH); });
+}
+route();
+if (STATIC) window.addEventListener("hashchange", () => { route(); board = null; load(); window.scrollTo(0, 0); });
 
 async function load() {
   try {
-    const b = await (await fetch(BOARD_URL, { cache: "no-store" })).json();
+    const b = STATIC ? STATIC[BOARD_URL] : await (await fetch(BOARD_URL, { cache: "no-store" })).json();
     if (b && b.props) {
       board = b;
       // don't redraw while the user is typing a multiplier or entry amount
@@ -473,7 +483,7 @@ $("#stake").addEventListener("input", () => { LS("stake_unit", $("#stake").value
   await load();
   $("#stake").value = LS("stake_unit") || (board && board.unit) || 10;
   board && render();
-  setInterval(load, 30000);
+  if (!STATIC) setInterval(load, 30000);
 })();
 </script>
 </body>

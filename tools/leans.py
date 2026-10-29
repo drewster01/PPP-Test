@@ -252,6 +252,8 @@ def nfl_rows(summ: dict) -> dict:
         r["Rush+Rec Yds"] = r.get("Rush Yards", 0) + r.get("Receiving Yards", 0)
         r["Pass+Rush Yds"] = r.get("Pass Yards", 0) + r.get("Rush Yards", 0)
         r["Anytime TDs"] = r.get("Rush TDs", 0) + r.get("Rec TDs", 0)
+        if r.get("Pass Attempts"):
+            r["Completion Percentage"] = round(100 * r["Pass Completions"] / r["Pass Attempts"], 1)
     return out
 
 
