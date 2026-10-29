@@ -402,7 +402,7 @@ function renderLeans() {
   // leans whose line is up on PrizePicks (or was when the game started), best model confidence first
   const conf = l => l.model_conf ?? l.confidence;
   const L = (board.leans || []).filter(l => l.current_line != null && !l.cut)
-    .sort((a, b) => (a.favorite || 99) - (b.favorite || 99) || conf(b) - conf(a));
+    .sort((a, b) => conf(b) - conf(a));  // highest chance first; favorites keep their tag
   $("#picks").innerHTML = L.length ? L.map(l => `
     <div class="nrow ${conf(l) >= 62 ? "playrow" : ""}">
       ${l.photo ? `<img src="${esc(l.photo)}" alt="">` : `<div class="ini">${esc(ini(l.player))}</div>`}
