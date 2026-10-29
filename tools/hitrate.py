@@ -265,7 +265,10 @@ def _side_prob(side: str, line: float, lam: float, exp_min: float, disp: float, 
     (minutes +/- MINUTES_SD) and, with chance p_blow, a blowout where rotation players sit late."""
     total = 0.0
     cut = BLOWOUT_MINUTES_CUT if exp_min >= 24 else 0.0
-    draws = [(dm, w * (1 - p_blow)) for dm, w in ((-MINUTES_SD, 0.25), (0.0, 0.5), (MINUTES_SD, 0.25))]
+    # recent minutes already include blowouts: lift normal games so the average stays at exp_min
+    # (SPY audit 10/29: without this the blowout cut counted twice and every Under ran ~4 pts hot)
+    lift = p_blow * cut / (1 - p_blow) if p_blow < 1 else 0.0
+    draws = [(dm + lift, w * (1 - p_blow)) for dm, w in ((-MINUTES_SD, 0.25), (0.0, 0.5), (MINUTES_SD, 0.25))]
     draws.append((-cut, p_blow))
     for dm, w in draws:
         mean = max(lam * (exp_min + dm) / exp_min, 0.01)

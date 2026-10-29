@@ -187,7 +187,11 @@ def breakeven(reduced: bool) -> float:
 
 
 REDUCED_FACTOR = (15 / 25) ** (1 / 4)  # same as ppedge.config.ADJUSTED_LEG_FACTOR
-MARKET_WEIGHT = 0.65
+MARKET_WEIGHT = 0.75
+# SPY audit 10/29 (128 lines vs Pinnacle): the market keeps almost none of the model's deviation on
+# points and PRA, more on threes and assists. Weight on the market, by stat:
+MARKET_WEIGHT_BY_STAT = {"Points": 0.9, "Pts+Rebs+Asts": 0.9, "Pts+Rebs": 0.85, "Pts+Asts": 0.85,
+                         "3-PT Made": 0.6, "Assists": 0.6}
 MARKET_DISAGREE = 12  # points between market and model worth flagging
 
 
@@ -236,7 +240,8 @@ def score(league: str, lean: dict, m: dict) -> None:
     mkt = lean.get("market_p")
     if mkt is not None and data_p is not None:
         # sharp price at this exact line: the market leads, the model adjusts (Russell / Unabated)
-        data_p = round(100 / (1 + math.exp(-(MARKET_WEIGHT * logit(mkt / 100) + (1 - MARKET_WEIGHT) * logit(data_p / 100)))))
+        wm = MARKET_WEIGHT_BY_STAT.get(lean["stat"], MARKET_WEIGHT)
+        data_p = round(100 / (1 + math.exp(-(wm * logit(mkt / 100) + (1 - wm) * logit(data_p / 100)))))
     lean["record_prob"] = round(record_p)
     if data_p is None:
         conf = (1 - w) * lean["confidence"] + w * record_p
