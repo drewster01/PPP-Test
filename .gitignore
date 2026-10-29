@@ -1,0 +1,28 @@
+# Virtual environment
+.venv/
+
+# Python cache and build output
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+
+# Tooling caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Environment / secrets
+.env
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Pulled data, logs and outputs (may contain licensed odds data)
+data/
+props_edge_results.csv
+props_report.md

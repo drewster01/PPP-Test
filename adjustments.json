@@ -1,0 +1,121 @@
+{
+  "_help": [
+    "Two kinds of entries.",
+    "narrative: true  -> goes ONLY to the Narrative board: shown as 'books' odds vs 'with narrative' odds, never used in the main picks or lineups.",
+    "no narrative flag -> research-based adjustment applied to the main board (kept small and capped).",
+    "delta_pp: percentage points added to the named side (1.0 = +1%). Capped at 3 per entry.",
+    "thought: the one-line narrative shown on the board.",
+    "player matches full name or last name; team (TB/DAL) and positions narrow the match; stat keys are in ppedge/config.py."
+  ],
+  "as_of": "2026-10-08",
+  "adjustments": [
+    {
+      "id": "pickens-big-game",
+      "narrative": true,
+      "player": "George Pickens",
+      "stat": ["receptions", "targets"],
+      "side": "Over",
+      "delta_pp": 3.0,
+      "thought": "Barely involved last game (3 catches). Big game incoming: target share should rebound, he's gone over in 6 of his last 8 home games, TB is missing CB Morrison, and Lamb is on the injury report (thigh)."
+    },
+    {
+      "id": "pickens-big-game-yards",
+      "narrative": true,
+      "player": "George Pickens",
+      "stat": ["rec_yds"],
+      "side": "Over",
+      "delta_pp": 2.0,
+      "thought": "Same bounce-back thesis; smaller lean on yards since yardage swings on a few big plays."
+    },
+    {
+      "id": "porter-shadow-godwin",
+      "narrative": true,
+      "player": "Chris Godwin",
+      "stat": ["receptions", "rec_yds"],
+      "side": "Over",
+      "delta_pp": 2.0,
+      "thought": "Cowboys CB Porter expected to shadow Egbuka, pushing volume to Godwin. Season-high 7 targets from Daniels last week."
+    },
+    {
+      "id": "porter-shadow-egbuka",
+      "narrative": true,
+      "player": "Emeka Egbuka",
+      "stat": ["receptions", "rec_yds"],
+      "side": "Under",
+      "delta_pp": 2.0,
+      "thought": "Likely shadowed by Porter. Caught 2 for 13 in Daniels' debut and has gone under his receptions in 11 of his last 16."
+    },
+    {
+      "id": "daniels-qb-runs",
+      "narrative": true,
+      "player": "Jalon Daniels",
+      "stat": ["rush_att", "rush_yds"],
+      "side": "Over",
+      "delta_pp": 2.0,
+      "thought": "Dallas has faced the most QB rush attempts (27) and allowed the most QB rush yards (188) in the league. Daniels ran 8 times in his first start."
+    },
+    {
+      "id": "williams-run-wall",
+      "narrative": true,
+      "player": "Javonte Williams",
+      "stat": ["rush_yds"],
+      "side": "Under",
+      "delta_pp": 2.0,
+      "thought": "Tampa Bay allows just 3.2 yards per carry, and Williams is averaging 3.7. Hard matchup on the ground."
+    },
+    {
+      "id": "williams-catches",
+      "narrative": true,
+      "player": "Javonte Williams",
+      "stat": ["receptions"],
+      "side": "Over",
+      "delta_pp": 2.0,
+      "thought": "With the run game stuffed, Dallas may use him through the air; he's cleared his receiving line in 3 of 4 games."
+    },
+    {
+      "id": "otton-volume",
+      "narrative": true,
+      "player": "Cade Otton",
+      "stat": ["receptions", "rec_yds"],
+      "side": "Over",
+      "delta_pp": 1.5,
+      "thought": "Six targets in each of his last three games; Daniels' second-favorite target, and Dallas allows the third-worst completion rate."
+    },
+    {
+      "id": "gainwell-checkdowns",
+      "narrative": true,
+      "player": "Kenny Gainwell",
+      "stat": ["receptions"],
+      "side": "Over",
+      "delta_pp": 1.5,
+      "thought": "Rookie QB playing from behind checks down to backs; drew 3 targets in Daniels' first start."
+    },
+    {
+      "id": "lamb-volume",
+      "narrative": true,
+      "player": "CeeDee Lamb",
+      "stat": ["receptions"],
+      "side": "Over",
+      "delta_pp": 1.5,
+      "thought": "8, 7 and 17 catches in his last three with a 30.5% target share, facing a short-handed secondary. Small risk: thigh on the injury report."
+    },
+    {
+      "id": "goodson-blowout",
+      "narrative": true,
+      "player": "Tyler Goodson",
+      "stat": ["rush_yds"],
+      "side": "Over",
+      "delta_pp": 1.5,
+      "thought": "Blowout script: Dallas is an 8.5-point favorite, so he should get late carries. Minor ankle issue."
+    },
+    {
+      "id": "lit-primetime-over-bias",
+      "positions": ["QB", "WR"],
+      "stat": ["pass_yds", "rec_yds"],
+      "side": "Under",
+      "delta_pp": 1.5,
+      "priced_in": false,
+      "reason": "Research: bettors overbet Overs, most in high-profile games (Paul & Weinbach 2002, 2011). Evidence is from game totals, not props, and faded after 2010, so this is a small prior (about 0.5 pts after weighting)."
+    }
+  ]
+}

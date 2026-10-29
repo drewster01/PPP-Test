@@ -1,0 +1,480 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Props Board</title>
+<style>
+:root{
+  --bg:#0b0b10; --panel:#15151d; --card:#1c1c26; --line:#2a2a38;
+  --text:#f2f2f7; --muted:#9a9ab0; --dim:#6d6d85; --accent:#8b5cf6;
+  --more:#22c55e; --more-bg:rgba(34,197,94,.14);
+  --less:#f43f5e; --less-bg:rgba(244,63,94,.14);
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{margin:0;background:var(--bg);color:var(--text);font:15px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+header{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;padding:18px 20px;border-bottom:1px solid var(--line)}
+h1{margin:0;font-size:20px}
+.sub{color:var(--muted);font-size:13px}
+.sub span{margin-right:14px}
+main{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(0,1fr);gap:24px;padding:20px;max-width:1400px;margin:0 auto}
+@media (max-width:900px){main{grid-template-columns:1fr;padding:16px}}
+h2{font-size:15px;margin:0 0 12px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.6px}
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:12px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;overflow:hidden;display:flex;flex-direction:column;position:relative}
+.card .odds-chip{position:absolute;top:8px;right:10px;font-weight:800;font-size:13px;font-variant-numeric:tabular-nums}
+.card .ev-chip{position:absolute;top:8px;left:10px;font-weight:800;font-size:11px;color:var(--more);background:var(--more-bg);border-radius:6px;padding:2px 6px}
+.lh .ev,.ev{color:var(--more);font-weight:700}
+.note{color:var(--dim);font-size:12px}
+.neg{color:var(--less);font-weight:700}
+.adjnote{font-size:11px;color:#facc15;margin-top:4px}
+.tabs{display:flex;gap:6px;padding:10px 20px 0;max-width:1400px;margin:0 auto}
+.tabs a{padding:8px 14px;border-radius:9px 9px 0 0;color:var(--muted);text-decoration:none;font-weight:600;border:1px solid var(--line);border-bottom:none;background:var(--panel)}
+.tabs a.on{color:#fff;background:var(--accent);border-color:var(--accent)}
+.tabs.league{padding-top:14px}
+.tabs.league a{border-radius:9px;border-bottom:1px solid var(--line);font-size:15px}
+.tabs.league a.on{background:#fff;color:#000;border-color:#fff}
+.res{font-weight:800;font-size:12px;border-radius:7px;padding:4px 9px;text-transform:uppercase}
+.res.hit{background:var(--more-bg);color:var(--more)}
+.res.miss{background:var(--less-bg);color:var(--less)}
+.res.push,.res.void{background:var(--bg);color:var(--muted);border:1px solid var(--line)}
+.nrow.hitrow{border-color:rgba(34,197,94,.55)}
+.nrow.missrow{border-color:rgba(244,63,94,.4)}
+.record{font-size:28px;font-weight:800}
+.list{margin:6px 0 0;padding-left:18px;color:var(--muted);font-size:13px}
+.switch{margin-left:auto;color:var(--accent);text-decoration:none;font-weight:600;font-size:14px}
+.card .books{font-size:12px;color:var(--muted);margin-top:4px}
+.card .books b{color:var(--more)}
+.card .thought{font-size:11px;color:var(--dim);margin-top:4px;line-height:1.35}
+.adjnote.std{color:var(--more)}
+.adjnote.est{color:var(--muted)}
+.nrow.playrow{border-color:rgba(34,197,94,.55)}
+.ltype{font-size:10px;font-weight:800;border-radius:6px;padding:2px 6px;background:var(--bg);border:1px solid var(--line);color:var(--muted)}
+.ltype.demon{color:#f43f5e;border-color:rgba(244,63,94,.45)}
+.ltype.goblin{color:#22c55e;border-color:rgba(34,197,94,.45)}
+.ltype.reduced{color:#facc15;border-color:rgba(250,204,21,.45)}
+.src-odds{display:flex;flex-direction:column;align-items:stretch;gap:4px;margin:8px 10px 0;font-size:12px;color:var(--text);font-variant-numeric:tabular-nums}
+.src-odds div{background:var(--bg);border:1px solid var(--line);border-radius:7px;padding:4px 8px;white-space:nowrap;display:flex;gap:6px;justify-content:space-between}
+.src-odds div.same{border-color:rgba(34,197,94,.55)}
+.card .odds-chip small{display:block;font-size:9px;font-weight:600;color:var(--muted);text-align:right}
+.card .odds-chip.dim{color:var(--muted)}
+.src-odds span{color:var(--muted);margin-right:4px;font-weight:600}
+.src-odds i{color:var(--dim);font-style:normal}
+.flags{display:flex;flex-wrap:wrap;gap:4px;justify-content:center;padding:4px 8px 0}
+.sit{font-size:10px;font-weight:700;border-radius:6px;padding:2px 6px;background:var(--bg);border:1px solid var(--line);color:var(--muted)}
+.sit.BLOWOUT{color:#f97316;border-color:rgba(249,115,22,.4)}
+.sit.PACE_UP{color:var(--more);border-color:rgba(34,197,94,.35)}
+.sit.PACE_DOWN{color:var(--less);border-color:rgba(244,63,94,.35)}
+.sit.MOVED{color:#facc15;border-color:rgba(250,204,21,.45)}
+.news-chip{position:absolute;top:30px;left:10px;font-size:10px;font-weight:800;border-radius:6px;padding:2px 6px}
+.nrow .news-chip{position:static}
+.news-chip.out{background:var(--less-bg);color:var(--less)}
+.news-chip.q{background:rgba(250,204,21,.15);color:#facc15}
+.news-chip.info{background:rgba(139,92,246,.18);color:#a78bfa}
+.apps{display:flex;flex-direction:column;gap:4px;margin-top:6px}
+.app{font-size:13px;color:var(--muted);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:5px 8px}
+.app.best{border-color:var(--more);color:var(--text)}
+.app .nm{font-weight:700;color:var(--text);margin-right:4px}
+.app .pick{padding:1px 6px;font-size:10px}
+.pos{color:var(--more)}
+.leg .adj{font-size:10px;color:#facc15;margin-left:6px}
+.pay input.mult{width:54px;background:var(--bg);border:1px solid var(--line);border-radius:6px;color:var(--text);padding:2px 4px;font:inherit;font-size:13px}
+.card .photo{height:96px;display:flex;justify-content:center;align-items:flex-end;padding-top:8px}
+.card .photo img{height:88px;width:auto;object-fit:contain}
+.card .photo .ini{width:72px;height:72px;border-radius:50%;display:grid;place-items:center;font-weight:800;font-size:22px;background:#2a2a38;color:var(--muted);margin-bottom:8px}
+.card .meta{text-align:center;padding:4px 10px 10px}
+.card .tp{color:var(--muted);font-size:12px}
+.card .nm{font-weight:700;font-size:16px;margin:1px 0}
+.card .gm{font-size:12px;color:var(--muted)}
+.card .gm b{color:var(--text)}
+.card .ln{margin-top:8px;font-size:13px;color:var(--muted)}
+.card .ln b{font-size:22px;color:var(--text);margin-right:4px}
+.card .btns{display:grid;grid-template-columns:1fr 1fr;border-top:1px solid var(--line);margin-top:auto}
+.card .btns div{text-align:center;padding:10px 0;font-weight:600;color:var(--muted)}
+.card .btns div:first-child{border-right:1px solid var(--line)}
+.card .btns .on.More{background:var(--more-bg);color:var(--more)}
+.card .btns .on.Less{background:var(--less-bg);color:var(--less)}
+.leg img{height:28px;width:28px;object-fit:cover;border-radius:50%;background:#2a2a38;margin-right:8px;vertical-align:middle}
+.pick{font-weight:800;font-size:12px;border-radius:7px;padding:5px 10px;text-transform:uppercase;letter-spacing:.4px}
+.pick.More{background:var(--more-bg);color:var(--more)}
+.pick.Less{background:var(--less-bg);color:var(--less)}
+.odds{font-weight:800;font-variant-numeric:tabular-nums;min-width:52px;text-align:right}
+.lineup{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:12px}
+.lh{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px}
+.lh b{font-size:16px}
+.lh span{color:var(--muted);font-size:13px}
+.leg{display:flex;justify-content:space-between;gap:10px;padding:6px 0;border-bottom:1px solid var(--line);font-size:14px}
+.leg:last-of-type{border-bottom:0}
+.leg .pick{padding:3px 8px;font-size:11px}
+.pay{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.pay div{background:var(--card);border-radius:8px;padding:6px 10px;font-size:13px}
+.pay div b{color:var(--more)}
+.stake{display:flex;align-items:center;gap:8px;margin-bottom:12px;color:var(--muted);font-size:13px}
+.stake input{width:110px;background:var(--card);border:1px solid var(--line);border-radius:8px;color:var(--text);padding:6px 9px;font:inherit}
+.empty{color:var(--muted);padding:20px 0}
+.narr{max-width:1400px;margin:0 auto;padding:4px 20px 24px}
+.narr .note{color:var(--dim);font-size:12px;margin:-6px 0 12px}
+.nrow{display:grid;grid-template-columns:56px minmax(0,1fr) auto;gap:14px;align-items:center;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-bottom:8px}
+.nrow img,.nrow .ini{width:56px;height:56px;border-radius:50%;object-fit:cover;background:#2a2a38;display:grid;place-items:center;font-weight:800;color:var(--muted)}
+.nrow .top{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.nrow .top b{font-size:15px}
+.nrow .th{color:var(--muted);font-size:13px;margin-top:4px}
+.nrow .od{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.nrow .od div{font-size:12px;color:var(--muted)}
+.nrow .od b{font-size:16px;color:var(--text)}
+.nrow .od .n b{color:var(--more)}
+.tag{font-size:11px;font-weight:700;border-radius:6px;padding:2px 6px;background:rgba(250,204,21,.15);color:#facc15}
+footer{max-width:1300px;margin:0 auto;padding:0 20px 30px;color:var(--dim);font-size:12px}
+</style>
+</head>
+<body>
+<header>
+  <h1 id="title">Props Board</h1>
+  <a id="switch" class="switch" href="/narratives">Narrative Board &rarr;</a>
+  <div class="sub" id="sub">Loading...</div>
+</header>
+<nav class="tabs league" id="leagues">
+  <a href="/nba/picks" data-l="nba">NBA</a>
+  <a href="/nfl/picks" data-l="nfl">NFL</a>
+</nav>
+<nav class="tabs" id="tabs">
+  <a data-p="picks">Picks (Pinnacle)</a>
+  <a data-p="leans">Leans</a>
+  <a data-p="results">Results</a>
+</nav>
+<main>
+  <section>
+    <div id="combos"></div>
+    <h2 id="mainHead">Best picks</h2>
+    <div id="picks"></div>
+  </section>
+  <section id="sideCol">
+    <div id="otherNote" class="lineup" hidden></div>
+    <div class="stake">Entry (1 unit) $ <input id="stake" type="number" min="0" step="1"></div>
+    <h2>Diversified Flex plays</h2>
+    <div id="portfolio"></div>
+    <h2 style="margin-top:22px">Best single lineups</h2>
+    <div id="lineups"></div>
+  </section>
+</main>
+<section class="narr" id="narrSection" hidden>
+  <h2>Narrative board</h2>
+  <div class="note">Your reads on top of the books. Odds shown both ways. Narratives never change the picks or lineups above.</div>
+  <div id="narratives"></div>
+</section>
+<footer>Odds = what a sportsbook would charge at the PrizePicks line, with no vig. Lines move: check the app before entering.</footer>
+
+<script>
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const odds = a => (a > 0 ? "+" : "") + a;
+const usd = v => "$" + v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const LS = (k, v) => { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (e) { return null; } };
+let board = null;
+const NARR = false;
+// /<league>/<page>: league is nba or nfl, page is picks, leans or results
+const [, LEAGUE_PATH = "nba", PAGE = "picks"] = location.pathname.split("/");
+const PLATFORM = PAGE === "leans" ? "leans" : PAGE === "results" ? "results" : "mores";
+const BOARD_URL = `/${LEAGUE_PATH}/${PLATFORM === "mores" ? "board.json" : `board_${PLATFORM}.json`}`;
+const PP_LIKE = PLATFORM === "mores";
+document.querySelectorAll("#tabs a").forEach(a => { a.href = `/${LEAGUE_PATH}/${a.dataset.p}`; a.classList.toggle("on", a.dataset.p === PAGE); });
+document.querySelectorAll("#leagues a").forEach(a => { a.href = `/${a.dataset.l}/${PAGE}`; a.classList.toggle("on", a.dataset.l === LEAGUE_PATH); });
+
+async function load() {
+  try {
+    const b = await (await fetch(BOARD_URL, { cache: "no-store" })).json();
+    if (b && b.props) {
+      board = b;
+      // don't redraw while the user is typing a multiplier or entry amount
+      if (!(document.activeElement && document.activeElement.tagName === "INPUT")) render();
+    }
+  } catch (e) { $("#sub").textContent = "Board offline"; }
+}
+
+function render() {
+  const t = iso => iso ? new Date(iso).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) : "n/a";
+  // narratives are NFL-only for now: hide the switch on other leagues
+  $("#switch").hidden = true;
+  const lg = LEAGUE_PATH.toUpperCase() + " ";
+  $("#title").textContent = PLATFORM === "mores" ? lg + "Picks: PrizePicks vs Pinnacle"
+    : PLATFORM === "leans" ? lg + "Research Leans" : lg + "Lean Results";
+  $("#mainHead").textContent = PLATFORM === "mores" ? "Best odds vs Pinnacle (More and Less)" : PLATFORM === "leans" ? "Today's leans" : "Graded leans";
+  const other = !PP_LIKE;
+  document.querySelectorAll("#sideCol > :not(#otherNote)").forEach(el => el.hidden = other);
+  $("#otherNote").hidden = !other;
+  const ms = new Date(board.kickoff) - Date.now();
+  $("#sub").innerHTML = `<span>${esc(board.game)}</span>${board.kickoff ? `<span>${ms > 0 ? `${LEAGUE_PATH === "nba" ? "First tip in" : "Kickoff in"} ${Math.floor(ms / 3600000)}h ${Math.floor(ms / 60000) % 60}m` : "Games started"}</span>` : ""}<span>Updated ${t(board.generated_at)}</span>`;
+
+  const when = iso => iso ? new Date(iso).toLocaleString([], { weekday: "short", hour: "numeric", minute: "2-digit" }).replace(" AM", "am").replace(" PM", "pm") : "";
+  const ini = n => n.split(" ").filter(w => !/^(jr|sr|ii|iii|iv)\.?$/i.test(w)).map(w => w[0]).slice(0, 2).join("");
+  // rank by value after PrizePicks' reduced payout on adjusted lines
+  if (PLATFORM === "leans") { renderLeans(); return; }
+  if (PLATFORM === "results") { renderResults(); return; }
+  const MORES_VIEW = true;
+  renderCombos();
+  if (MORES_VIEW) board.props.forEach(p => {
+    const b = bestSide(p);
+    p._best = b;
+    if (b) p.pick = b.side;
+  });
+  const picks = MORES_VIEW
+    // best side by Pinnacle's posted price, only where the app's line is as easy or easier for that side
+    ? board.props.filter(p => p._best).sort((a, b) => b._best.prob - a._best.prob).slice(0, 72)
+    : board.props.filter(p => p.tier === "sharp" && (!PP_LIKE || p.adj > 0.5))
+        .sort((a, b) => (b.adj - b.need) - (a.adj - a.need)).slice(0, 24);
+  $("#picks").innerHTML = picks.length ? `<div class="cards">${picks.map(p => `
+    <div class="card">
+      ${p.plus_ev ? `<span class="ev-chip">+EV</span>` : ""}
+      ${newsBadge(p.news)}
+      <div class="flags">${(p.situations || []).map(x => `<span class="sit ${x.flag}" title="${esc(x.note)}">${{BLOWOUT: "Blowout risk", PACE_UP: "Pace up", PACE_DOWN: "Pace down"}[x.flag] || esc(x.flag)}</span>`).join("")}${p.moved ? `<span class="sit MOVED" title="Books moved since ${esc(p.moved.since || "")}, app line unchanged">Books moved ${p.moved.delta_over > 0 ? "toward More" : "toward Less"} ${Math.abs(p.moved.delta_over * 100).toFixed(1)} pts</span>` : ""}</div>
+      ${MORES_VIEW
+        ? `<span class="odds-chip">${odds(p._best.am)}<small>Pinnacle ${p._best.side === "More" ? "O" : "U"} ${p._best.line}${p._best.easier ? " (easier here)" : ""}</small></span>`
+        : `<span class="odds-chip">${odds(p.american)}</span>`}
+      <div class="photo">${p.photo ? `<img src="${esc(p.photo)}" alt="" loading="lazy" onerror="this.outerHTML='<div class=ini>${esc(ini(p.player))}</div>'">` : `<div class="ini">${esc(ini(p.player))}</div>`}</div>
+      <div class="meta">
+        <div class="tp">${esc(p.team)}${p.pos ? " - " + esc(p.pos) : ""}</div>
+        <div class="nm">${esc(p.player)}</div>
+        <div class="gm"><b>vs ${esc(p.opp || "")}</b> ${esc(when(p.start))}</div>
+        <div class="ln"><b>${p.line}</b>${esc(p.stat)}</div>
+        ${srcOdds(p)}
+        ${p.derived ? `<div class="adjnote est">Estimate: built from component lines</div>` : ""}
+      </div>
+      <div class="btns">
+        <div class="${p.pick === "Less" ? "on Less" : ""}">&darr; Less</div>
+        <div class="${p.pick === "More" ? "on More" : ""}">&uarr; More</div>
+      </div>
+    </div>`).join("")}</div>` : `<div class="empty">No picks yet.</div>`;
+
+  const nar = board.narratives || [];
+  $("#narrSection").hidden = !nar.length;  // pure-market mode: no narratives, no section
+  $("#narratives").innerHTML = nar.length ? nar.map(n => `
+    <div class="nrow">
+      ${n.photo ? `<img src="${esc(n.photo)}" alt="">` : `<div class="ini">${esc(ini(n.player))}</div>`}
+      <div>
+        <div class="top"><b>${esc(n.player)}</b><span class="stat">${esc(n.team)} - ${esc(n.pos || "")} · ${n.line} ${esc(n.stat)}</span>
+          <span class="pick ${n.pick}">${n.pick}</span>${n.plus_ev ? `<span class="ev-chip" style="position:static">+EV</span>` : ""}${n.agrees_with_books ? "" : `<span class="tag">Against the books</span>`}</div>
+        <div class="th">${esc(n.thought)}</div>
+      </div>
+      <div class="od"><div>Books <b>${odds(n.book_american)}</b></div><div class="n">With narrative <b>${odds(n.narr_american)}</b></div></div>
+    </div>`).join("") : `<div class="empty">No narratives match tonight's lines.</div>`;
+
+  const stake = +($("#stake").value || 0);
+  const menu = (board.menu || []).filter(m => m.ev >= 1);  // only lineups that beat the payout
+  const port = board.portfolio || [];
+  const expo = {};
+  port.forEach(m => m.legs.forEach(l => { expo[l.player] = (expo[l.player] || 0) + 1; }));
+  const totStake = stake * port.length, totEv = port.reduce((s, m) => s + stake * (effective(m).ev - 1), 0);
+  $("#portfolio").innerHTML = port.length ? `
+    <div class="lh" style="margin-bottom:10px"><span>${port.length} entries · ${usd(totStake)} total</span><span class="${totEv >= 0 ? "ev" : "neg"}">${totEv >= 0 ? "+" : "-"}${usd(Math.abs(totEv))} expected</span></div>
+    ${port.map((m, i) => lineupHTML(m, i, stake)).join("")}
+    <div class="note">Player exposure: ${Object.entries(expo).sort((a, b) => b[1] - a[1]).map(([p, c]) => `${esc(p)} ${c}/${port.length}`).join(" · ")}</div>`
+    : `<div class="empty">No diversified Flex plays clear the payout right now.</div>`;
+
+  $("#lineups").innerHTML = menu.length ? menu.map((m, i) => lineupHTML(m, i, stake)).join("") : `<div class="empty">No lineup beats PrizePicks' payout right now (after reduced payouts). Best move may be a single small entry or sitting out.</div>`;
+}
+
+// PrizePicks adjusts multipliers per lineup; the user can enter the app's real numbers.
+function customMults(m) { try { return JSON.parse(LS("mult:" + m.key) || "{}"); } catch (e) { return {}; } }
+
+// EV with the app's multipliers. Starts from the model's conservative EV and adds the
+// change in payout, so a custom multiplier never makes the estimate less cautious.
+function effective(m) {
+  const c = customMults(m), n = m.size;
+  const stdTop = (m.payouts[0] || {}).mult || 1;
+  const scale = c[n] != null ? c[n] / stdTop : 1;
+  let stdEv = 0, newEv = 0, pProfit = 0;
+  for (const o of m.outcomes || []) {
+    const mult = o.m === n ? (c[o.h] != null ? c[o.h] : o.mult) : o.mult * scale;
+    stdEv += o.prob * o.mult; newEv += o.prob * mult;
+    if (mult > 1) pProfit += o.prob;
+  }
+  return { ev: m.ev + (newEv - stdEv), pProfit: m.outcomes ? pProfit : m.p_profit, custom: Object.keys(c).length > 0 };
+}
+
+// What Pinnacle and Kalshi actually post for this player and stat (raw, as shown on each site)
+function probToAm(q) { return Math.round(q >= 0.5 ? -100 * q / (1 - q) : 100 * (1 - q) / q); }
+function amToProb(a) { return a < 0 ? -a / (-a + 100) : 100 / (a + 100); }
+// The source price on PrizePicks' exact line for the More side (Kalshi "N+" where N = line rounded up)
+function direct(p) {
+  const bs = p.by_source || {}, out = [];
+  if (bs.pinnacle && bs.pinnacle.line === p.line) out.push({ src: "Pinnacle", am: Math.round(bs.pinnacle.over), prob: amToProb(bs.pinnacle.over) });
+  if (bs.kalshi && bs.kalshi.n === Math.floor(p.line) + 1) out.push({ src: "Kalshi", am: probToAm(bs.kalshi.yes_ask), prob: bs.kalshi.yes_ask });
+  return out.sort((a, b) => b.prob - a.prob)[0] || null;
+}
+// Best side by Pinnacle's posted price. More counts if the app line <= Pinnacle's line,
+// Less counts if the app line >= Pinnacle's line (as easy or easier for that side).
+function bestSide(p) {
+  const pin = (p.by_source || {}).pinnacle;
+  if (!pin) return null;
+  const opts = [];
+  const lessOk = !p.more_only, moreOk = true;
+  if (moreOk && p.line <= pin.line && pin.over != null)
+    opts.push({ side: "More", am: Math.round(pin.over), prob: amToProb(pin.over), line: pin.line, easier: p.line < pin.line });
+  if (lessOk && p.line >= pin.line && pin.under != null)
+    opts.push({ side: "Less", am: Math.round(pin.under), prob: amToProb(pin.under), line: pin.line, easier: p.line > pin.line });
+  return opts.sort((a, b) => b.prob - a.prob)[0] || null;
+}
+// Straight-up ordering: posted same-line price first (most favored), then Pinnacle's posted Over
+function postedRank(p) {
+  const d = direct(p);
+  if (d) return 10 + d.prob;
+  const pin = (p.by_source || {}).pinnacle;
+  return pin ? amToProb(pin.over) : 0;
+}
+// Chance the More wins at PrizePicks' exact line, per sharp source (push = refund).
+function moreChance(p) {
+  const bs = p.by_source || {}, parts = [];
+  if (bs.pinnacle && bs.pinnacle.p_more != null) parts.push(["Pinnacle", bs.pinnacle.p_more]);
+  if (bs.kalshi && bs.kalshi.p_more != null) parts.push(["Kalshi", bs.kalshi.p_more]);
+  if (!parts.length) return null;
+  const avg = parts.reduce((t, x) => t + x[1], 0) / parts.length;
+  return { p: avg, label: parts.map(x => `${x[0]} ${Math.round(x[1] * 100)}%`).join(" · ") };
+}
+// How far PrizePicks' line is below Pinnacle's line and Kalshi's implied line (50-cent point).
+// Positive = PrizePicks is lower = easier More. Score scales by line size (sqrt), so a
+// 2-rebound gap ranks above a 2-point gap.
+function lineGap(p) {
+  const bs = p.by_source || {}, c = [];
+  if (bs.pinnacle) c.push({ src: `Pinnacle ${bs.pinnacle.line}`, gap: bs.pinnacle.line - p.line });
+  if (bs.kalshi && bs.kalshi.median != null) c.push({ src: `Kalshi ~${bs.kalshi.median}`, gap: bs.kalshi.median - p.line });
+  if (!c.length) return null;
+  const best = c.sort((a, b) => b.gap - a.gap)[0];
+  best.gap = Math.round(best.gap * 10) / 10;
+  best.score = best.gap / Math.sqrt(Math.max(p.line, 1));
+  return best;
+}
+// PrizePicks combo lines vs the sum of Pinnacle's points / rebounds / assists lines.
+// Gap = Pinnacle sum - PrizePicks line: positive means the More is easier than the books' combined number.
+const STAT_ABBR = { pts: "Pts", reb: "Reb", ast: "Ast" };
+function renderCombos() {
+  const el = document.getElementById("combos");
+  el.innerHTML = ""; return;  // combos section turned off
+  const rows = board.props.filter(p => p.by_source && p.by_source.pin_sum).map(p => {
+    const sum = p.by_source.pin_sum.line, gap = Math.round((sum - p.line) * 10) / 10;
+    return { p, sum, gap, side: gap >= 0 ? "More" : "Less" };
+  }).sort((a, b) => Math.abs(b.gap) / Math.sqrt(Math.max(b.p.line, 1)) - Math.abs(a.gap) / Math.sqrt(Math.max(a.p.line, 1)));
+  el.innerHTML = rows.length ? `<h2>Combos vs Pinnacle sums</h2>
+    <div class="note" style="margin:-6px 0 10px">Pinnacle's own points, rebounds and assists lines added up, compared with PrizePicks' combo line.</div>
+    ${rows.slice(0, 24).map(r => `<div class="nrow">
+      ${r.p.photo ? `<img src="${esc(r.p.photo)}" alt="">` : `<div class="ini">${esc(ini(r.p.player))}</div>`}
+      <div>
+        <div class="top"><b>${esc(r.p.player)}</b><span class="stat">${esc(r.p.team || "")} vs ${esc(r.p.opp || "")} · ${esc(r.p.stat)}</span>
+          <span class="pick ${r.side}">${r.side} ${r.p.line}</span></div>
+        <div class="th">Pinnacle: ${r.p.by_source.pin_sum.parts.map(c => `${STAT_ABBR[c.stat]} ${c.line} (O ${odds(Math.round(c.over))})`).join(" + ")} = <b>${r.sum}</b></div>
+      </div>
+      <div class="od"><div>PrizePicks ${r.p.line}</div><b class="${r.gap === 0 ? "" : "pos"}">${r.gap === 0 ? "Same" : (r.gap > 0 ? r.gap + " easier More" : -r.gap + " easier Less")}</b></div>
+    </div>`).join("")}<div style="height:14px"></div>` : "";
+}
+function srcOdds(p) {
+  const bs = p.by_source || {}, more = p.pick === "More", rows = [];
+  const pin = bs.pinnacle;
+  if (pin) rows.push(`<div class="${pin.line === p.line ? "same" : ""}"><span>Pinnacle</span>${more ? "O" : "U"} ${pin.line} ${odds(Math.round(more ? pin.over : pin.under))}</div>`);
+  // what the posted lines imply for More at PrizePicks' number (not a raw line gap)
+  const k = bs.kalshi;
+  if (k) {
+    // Kalshi contracts are "N+": Yes = More, No = Less; prices are what you pay
+    const cost = more ? k.yes_ask : 1 - k.yes_bid;
+    rows.push(`<div class="${k.exact ? "same" : ""}"><span>Kalshi${k.exact ? "" : " (nearest)"}</span>${k.n}+ ${more ? "Yes" : "No"} ${Math.round(cost * 100)}&cent; ${odds(probToAm(cost))}</div>`);
+  }
+  return rows.length ? `<div class="src-odds">${rows.join("")}</div>` : "";
+}
+function newsBadge(n) {
+  if (!n || !n.status) return "";
+  const cls = ["OUT", "DOUBTFUL"].includes(n.status) ? "out" : ["QUESTIONABLE", "MINUTES_LIMIT"].includes(n.status) ? "q" : "info";
+  return `<span class="news-chip ${cls}" title="${esc(n.note || "")}">${esc(n.status.replace("_", " "))}</span>`;
+}
+// ---------------------------------------------------------------- Leans
+// Research-based leans on niche PrizePicks lines the books don't price. Judgment, not market prices.
+function renderLeans() {
+  // leans whose line is up on PrizePicks (or was when the game started), best model confidence first
+  const conf = l => l.model_conf ?? l.confidence;
+  const L = (board.leans || []).filter(l => l.current_line != null && !l.cut)
+    .sort((a, b) => (a.favorite || 99) - (b.favorite || 99) || conf(b) - conf(a));
+  $("#picks").innerHTML = L.length ? L.map(l => `
+    <div class="nrow ${conf(l) >= 62 ? "playrow" : ""}">
+      ${l.photo ? `<img src="${esc(l.photo)}" alt="">` : `<div class="ini">${esc(ini(l.player))}</div>`}
+      <div>
+        <div class="top">${l.favorite ? `<span class="ev-chip" style="position:static">FAVORITE #${l.favorite}</span>` : ""}<b>${esc(l.player)}</b><span class="stat">${esc(l.team || "")} vs ${esc(l.opp || "")}</span>
+          <span class="pick ${l.side}">${l.side} ${l.current_line} ${esc(l.stat)}</span>
+          ${l.current_line !== l.line ? `<span class="tag">Researched at ${l.line}</span>` : ""}
+          ${l.locked ? `<span class="ltype">Game started</span>` : ""}
+          ${l.reduced_payout ? `<span class="ltype reduced">Reduced payout</span>` : `<span class="ltype">Full payout</span>`}${newsBadge(l.news)}</div>
+        <div class="th">${esc(l.why)}</div>
+        <div class="note" style="margin-top:4px">${l.projection != null ? `Projection ${l.projection} · ` : ""}Research ${l.confidence}% · Track record ${esc(l.track_record || "n/a")}</div>
+      </div>
+      <div class="od"><b class="${conf(l) >= 60 ? "pos" : ""}">${conf(l)}%</b><div>model</div></div>
+    </div>`).join("") : `<div class="empty">Research is still running. Leans will appear here.</div>`;
+  const m = board.model;
+  $("#otherNote").hidden = false;
+  $("#otherNote").innerHTML = `<b>How leans are scored</b>
+    <div class="note" style="margin-top:8px">Each lean starts from research (minutes x per-minute rate, injuries, matchup, pace, refs, blowout risk, last season vs this season).
+    The model then blends in the track record of that lean type from every graded day, so types that keep losing get marked down and types that keep winning get marked up.
+    Researched ${esc(board.researched_at || "")}.</div>
+    ${m ? `<h2 style="margin-top:14px">What the record says (${m.graded} graded)</h2>
+      <div class="note">More ${m.side.More} · Less ${m.side.Less}</div>
+      <ul class="list">${m.types.map(t => `<li>${esc(t[0])}: ${t[1]} (model ${t[2]}%)</li>`).join("")}</ul>` : ""}
+    ${(board.slate_notes || []).length ? `<h2 style="margin-top:14px">Slate notes</h2><ul class="list">${board.slate_notes.map(n => `<li>${esc(n)}</li>`).join("")}</ul>` : ""}`;
+}
+
+// ---------------------------------------------------------------- Results
+// Every graded day: did each lean hit, and what the player actually put up.
+function renderResults() {
+  const days = board.days || [];
+  $("#picks").innerHTML = days.length ? days.map(d => {
+    const date = new Date(+d.date.slice(0, 4), +d.date.slice(4, 6) - 1, +d.date.slice(6)).toLocaleDateString([], { weekday: "short", month: "short", day: "numeric" });
+    const rows = [...d.leans].sort((a, b) => (a.favorite || 99) - (b.favorite || 99) || (b.model_conf ?? b.confidence) - (a.model_conf ?? a.confidence));
+    return `<div class="lineup"><div class="lh"><b>${esc(date)}</b><span><span class="record">${d.record}</span> hit · favorites ${d.favorites_record}${d.pushes ? ` · ${d.pushes} push` : ""}</span></div></div>
+    ${rows.map(l => `<div class="nrow ${l.result}row">
+      ${l.photo ? `<img src="${esc(l.photo)}" alt="">` : `<div class="ini">${esc(ini(l.player))}</div>`}
+      <div>
+        <div class="top">${l.favorite ? `<span class="ev-chip" style="position:static">FAVORITE #${l.favorite}</span>` : ""}<b>${esc(l.player)}</b><span class="stat">${esc(l.team || "")} vs ${esc(l.opp || "")}</span>
+          <span class="pick ${l.side}">${l.side} ${l.line} ${esc(l.stat)}</span></div>
+        <div class="th">Put up <b style="color:var(--text)">${l.actual ?? "n/a"}</b>${l.minutes ? ` in ${l.minutes} min` : ""} · needed ${l.side === "More" ? "more than" : "less than"} ${l.line}${l.projection != null ? ` · projected ${l.projection}` : ""} · ${l.model_conf ?? l.confidence}%</div>
+      </div>
+      <div class="od"><span class="res ${l.result}">${l.result}</span></div>
+    </div>`).join("")}`;
+  }).join("") : `<div class="empty">No graded days yet. Leans are graded the morning after from the final box scores.</div>`;
+  const m = board.model;
+  $("#otherNote").hidden = false;
+  $("#otherNote").innerHTML = `<b>All-time record</b><div class="record" style="margin:6px 0">${esc(board.overall || "0/0")}</div>
+    ${m ? `<div class="note">More ${m.side.More} · Less ${m.side.Less}</div>
+    <h2 style="margin-top:14px">By lean type</h2><ul class="list">${m.types.map(t => `<li>${esc(t[0])}: ${t[1]} (model now rates it ${t[2]}%)</li>`).join("")}</ul>
+    <div class="note" style="margin-top:8px">New leans are scored with these records, so the board leans harder into what has been winning.</div>` : ""}`;
+}
+
+function lineupHTML(m, i, stake) {
+  const e = effective(m), c = customMults(m);
+  const top = c[m.size] != null ? c[m.size] : m.payouts[0].mult;
+  const sign = e.ev >= 1 ? "+" : "-";
+  return `
+    <div class="lineup">
+      <div class="lh"><b>${i + 1}. ${m.size}-pick ${m.fmt === "power" ? "Power" : "Flex"}</b><span>${top}x if all hit${e.custom ? " (app)" : ""}</span></div>
+      <div class="lh" style="margin-top:-4px"><span class="${e.ev >= 1 ? "ev" : "neg"}">${sign}${Math.abs((e.ev - 1) * 100).toFixed(1)}% EV · ${sign}${usd(Math.abs(stake * (e.ev - 1)))} per ${usd(stake)}</span><span>${(e.pProfit * 100).toFixed(0)}% chance of profit</span></div>
+      ${m.legs.map(l => `<div class="leg"><span>${l.photo ? `<img src="${esc(l.photo)}" alt="">` : ""}${esc(l.player)} · ${l.line} ${esc(l.stat)}${l.adjusted ? `<span class="adj">reduced payout</span>` : ""}</span><span class="pick ${l.pick}">${l.pick}</span></div>`).join("")}
+      <div class="pay">${m.payouts.map(p => { const h = +p.label.split("/")[0]; const mult = c[h] != null ? c[h] : p.mult;
+        return `<div>${esc(p.label)}: <input class="mult" data-key="${esc(m.key)}" data-h="${h}" type="number" step="0.05" min="0" value="${mult}">x <b>${usd(stake * mult)}</b></div>`; }).join("")}</div>
+      <div class="note" style="margin-top:6px">${e.custom ? "Using your app multipliers." : `Estimated multipliers (${m.legs.filter(l => l.adjusted).length} reduced-payout legs).`} Type the app's numbers to update EV.</div>
+    </div>`;
+}
+
+document.addEventListener("change", ev => {
+  const t = ev.target;
+  if (!t.classList || !t.classList.contains("mult")) return;
+  const key = "mult:" + t.dataset.key;
+  let c = {}; try { c = JSON.parse(LS(key) || "{}"); } catch (e) {}
+  if (t.value === "") delete c[t.dataset.h]; else c[t.dataset.h] = +t.value;
+  LS(key, JSON.stringify(c));
+  render();
+});
+
+$("#stake").addEventListener("input", () => { LS("stake_unit", $("#stake").value); board && render(); });
+(async () => {
+  await load();
+  $("#stake").value = LS("stake_unit") || (board && board.unit) || 10;
+  board && render();
+  setInterval(load, 30000);
+})();
+</script>
+</body>
+</html>

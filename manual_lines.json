@@ -1,0 +1,49 @@
+{
+  "_help": [
+    "Sportsbook and prediction-market quotes gathered by hand in the earlier chat (midday Oct 8 2026).",
+    "Used as a backup/supplement to SportsGameOdds. Weighted lower because they are older and from articles.",
+    "Fields: over/under are American odds. Omit 'under' for a one-sided price. Omit both for a line with no prices (assumed 50/50).",
+    "'prob' is a direct probability of the Over (for example a Kalshi '25+ yards' contract trading at 57c).",
+    "Set 'enabled' to false to ignore this file."
+  ],
+  "enabled": true,
+  "as_of": "2026-10-08T12:00:00-04:00",
+  "quotes": [
+    {"player": "Dak Prescott", "team": "DAL", "stat": "pass_yds", "book": "fanatics", "line": 265.5, "over": -111, "under": -113},
+    {"player": "Dak Prescott", "team": "DAL", "stat": "pass_yds", "book": "unknown1", "line": 268.5, "over": -115, "under": -115},
+    {"player": "Dak Prescott", "team": "DAL", "stat": "pass_td", "book": "draftkings", "line": 1.5, "over": -218, "under": 169},
+    {"player": "Dak Prescott", "team": "DAL", "stat": "pass_td", "book": "kalshi", "line": 2.5, "over": 160, "under": -222},
+    {"player": "Dak Prescott", "team": "DAL", "stat": "pass_comp", "book": "unknown1", "line": 23.5, "over": -105, "under": -126},
+
+    {"player": "Jalon Daniels", "team": "TB", "stat": "pass_yds", "book": "unknown1", "line": 181.5, "over": -111, "under": -113},
+    {"player": "Jalon Daniels", "team": "TB", "stat": "pass_yds", "book": "fanatics", "line": 185.5},
+    {"player": "Jalon Daniels", "team": "TB", "stat": "pass_yds", "book": "unknown2", "line": 180.5},
+    {"player": "Jalon Daniels", "team": "TB", "stat": "pass_td", "book": "unknown1", "line": 0.5, "over": -239, "under": 184},
+    {"player": "Jalon Daniels", "team": "TB", "stat": "pass_comp", "book": "unknown1", "line": 17.5, "over": -112, "under": -116},
+    {"player": "Jalon Daniels", "team": "TB", "stat": "rush_yds", "book": "unknown1", "line": 46.5, "over": -110, "under": -114},
+    {"player": "Jalon Daniels", "team": "TB", "stat": "rush_yds", "book": "betmgm", "line": 42.5, "over": -115},
+    {"player": "Jalon Daniels", "team": "TB", "stat": "rush_yds", "book": "unknown2", "line": 44.5, "over": -112},
+    {"player": "Jalon Daniels", "team": "TB", "stat": "rush_att", "book": "draftkings", "line": 7.5, "over": -111},
+    {"player": "Jalon Daniels", "team": "TB", "stat": "rush_att", "book": "pinnacle", "line": 7.5, "over": -128},
+    {"player": "Jalon Daniels", "team": "TB", "stat": "long_rush", "book": "draftkings", "line": 19.5, "over": 208},
+
+    {"player": "Javonte Williams", "team": "DAL", "stat": "rush_yds", "book": "unknown1", "line": 73.5, "over": -114, "under": -110},
+    {"player": "Javonte Williams", "team": "DAL", "stat": "receptions", "book": "kalshi", "line": 2.5, "over": -128, "under": -105},
+    {"player": "Javonte Williams", "team": "DAL", "stat": "rush_att", "book": "kalshi", "line": 17.5, "prob": 0.50},
+
+    {"player": "Bucky Irving", "team": "TB", "stat": "rush_yds", "book": "unknown1", "line": 51.5, "over": -115, "under": -109},
+    {"player": "Bucky Irving", "team": "TB", "stat": "rush_att", "book": "unknown1", "line": 13.5, "over": -107},
+    {"player": "Bucky Irving", "team": "TB", "stat": "rush_att", "book": "kalshi", "line": 13.5, "prob": 0.485},
+    {"player": "Bucky Irving", "team": "TB", "stat": "receptions", "book": "kalshi", "line": 2.5, "over": 115, "under": -154},
+
+    {"player": "CeeDee Lamb", "team": "DAL", "stat": "receptions", "book": "kalshi", "line": 6.5, "over": 105, "under": -139},
+    {"player": "CeeDee Lamb", "team": "DAL", "stat": "rec_yds", "book": "covers", "line": 79.5},
+    {"player": "George Pickens", "team": "DAL", "stat": "receptions", "book": "kalshi", "line": 4.5, "over": -133, "under": 100},
+    {"player": "Jake Ferguson", "team": "DAL", "stat": "receptions", "book": "betmgm", "line": 3.5, "over": 110},
+
+    {"player": "Kenny Gainwell", "team": "TB", "stat": "receptions", "book": "kalshi", "line": 1.5, "over": -168, "under": 129},
+    {"player": "Cade Otton", "team": "TB", "stat": "receptions", "book": "kalshi", "line": 3.5, "over": 105, "under": -139},
+    {"player": "Cade Otton", "team": "TB", "stat": "rec_yds", "book": "unknown1", "line": 24.5},
+    {"player": "Chris Godwin", "team": "TB", "stat": "rec_yds", "book": "kalshi", "line": 24.5, "prob": 0.57}
+  ]
+}
