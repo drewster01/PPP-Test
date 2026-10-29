@@ -6,6 +6,7 @@
     python tools/leans.py void  <league> <YYYYMMDD> "<player>" [note]  # player left early: don't count it
     python tools/leans.py model <league>                       # print the record, re-score today's leans
     python tools/leans.py vet   <league> <vet.json>            # apply a minutes-risk / late-news pass
+    python tools/leans.py calibrate <league>                   # score each model part, refit the blend
     python tools/leans.py brief <league>                       # the record as instructions for researchers
 
 Every graded lean goes into data/<league>/leans_history.json. The model turns that history into
@@ -171,7 +172,10 @@ def model(league: str) -> dict:
 
 
 # Final blend when the player's own numbers are available (research, his data, the lean-type record)
-DATA_BLEND = {"research": 0.35, "data": 0.40, "record": 0.25}
+# Backtest on 10/28 (46 leans): research confidence scored like a coin flip (Brier 0.250) while the data
+# model scored 0.215 (65%+ went 14/17, under 60% went 6/21), so the data carries the weight. Once enough
+# leans are graded, tools/leans.py calibrate refits these from the history (data/<league>/blend.json).
+DATA_BLEND = {"research": 0.10, "data": 0.70, "record": 0.20}
 VOLATILITY_SHRINK = 0.15
 NFL_LOW_YARDAGE_CAP = 62
 BREAKEVEN = 54.2  # per-pick hit rate a 5 or 6-pick Flex needs at full payout
@@ -205,10 +209,12 @@ def score(league: str, lean: dict, m: dict) -> None:
     data = lean.get("data") or {}
     # the player's own numbers: count model for NBA counting stats, else his shrunk hit rate
     data_p = data.get("stat_prob", data.get("hit_rate"))
+    lean["record_prob"] = round(record_p)
     if data_p is None:
         conf = (1 - w) * lean["confidence"] + w * record_p
     else:
-        conf = DATA_BLEND["research"] * lean["confidence"] + DATA_BLEND["data"] * data_p + DATA_BLEND["record"] * record_p
+        bl = load(ddir(league) / "blend.json", None) or DATA_BLEND
+        conf = bl["research"] * lean["confidence"] + bl["data"] * data_p + bl["record"] * record_p
     conf -= MINUTES_RISK_PENALTY[lean["side"]].get(lean.get("minutes_risk") or "", 0)
     flags = []
     if data.get("volatility") == "high":
@@ -275,7 +281,14 @@ def cmd_add(league: str, batch_path: str, label: str, notes: list[str]) -> None:
             continue
         l.update(current_line=cur.line, reduced_payout=bool(cur.adjusted), start=cur.start_time,
                  photo=headshots.find(photos, l["player"], l["team"]), **{"pass": label})
+        if l.get("verdict", "keep").lower() == "drop":
+            print("skip (dropped in verification):", l["player"], l["stat"])
+            continue
         l["data"] = hitrate.analyze(league, l)
+        # screened leans carry no gut confidence: research judgment sits at a neutral 58 for a "keep"
+        l.setdefault("confidence", VERIFIED_CONFIDENCE)
+        if l.get("projection") is None and l["data"]:
+            l["projection"] = l["data"].get("proj", l["data"].get("avg"))
         score(league, l, m)
         doc["leans"].append(l)
         have.add(key)
@@ -455,7 +468,7 @@ def cmd_grade(league: str, date: str) -> None:
         row = box.get(norm(l["player"]))
         g = {k: l.get(k) for k in ("player", "team", "opp", "stat", "side", "confidence", "model_conf", "favorite",
                                    "reduced_payout", "photo", "why", "pass", "projection", "minutes_risk",
-                                   "expected_minutes")}
+                                   "expected_minutes", "data", "record_prob", "usage_adj")}
         g["line"] = line
         act = None if row is None or row.get("dnp") else row.get(l["stat"])
         g["actual"] = act
@@ -543,6 +556,40 @@ def cmd_vet(league: str, vet_path: str) -> None:
     rescore(league)
 
 
+def cmd_calibrate(league: str) -> None:
+    """Score each part of the model on graded history (Brier: lower is better) and refit the blend."""
+    rows = [h for h in history() if h.get("league") == league and h.get("result") in ("hit", "miss")
+            and (h.get("data") or {}).get("stat_prob", (h.get("data") or {}).get("hit_rate")) is not None]
+    if not rows:
+        print("no graded leans with player data yet")
+        return
+    y = [h["result"] == "hit" for h in rows]
+    part = {"research": [h["confidence"] for h in rows],
+            "data": [h["data"].get("stat_prob", h["data"].get("hit_rate")) for h in rows],
+            "record": [h.get("record_prob") or 50 for h in rows]}
+    brier = lambda ps: sum((p / 100 - t) ** 2 for p, t in zip(ps, y)) / len(y)  # noqa: E731
+    for k, ps in part.items():
+        print(f"{k:8} Brier {brier(ps):.4f}")
+    best = None
+    for wr in range(0, 41, 5):
+        for wd in range(30, 101 - wr, 5):
+            w = {"research": wr / 100, "data": wd / 100, "record": (100 - wr - wd) / 100}
+            b = brier([w["research"] * r + w["data"] * d + w["record"] * c
+                       for r, d, c in zip(part["research"], part["data"], part["record"])])
+            if best is None or b < best[0]:
+                best = (b, w)
+    print(f"best blend on {len(rows)} leans: {best[1]} (Brier {best[0]:.4f})")
+    if len(rows) >= CALIBRATE_MIN:
+        save(ddir(league) / "blend.json", best[1])
+        print("saved: new leans use this blend")
+    else:
+        print(f"not saved: needs {CALIBRATE_MIN}+ graded leans with player data")
+
+
+CALIBRATE_MIN = 150
+VERIFIED_CONFIDENCE = 58
+
+
 # Standing research rules. The record-based lessons are added from the history each time.
 RESEARCH_RULES = """- Project every lean from per-minute (or per-snap) rate x expected minutes tonight, then adjust for
   injuries and usage, pace and total, the opponent's allowance for that stat, refs, rest and the spread.
@@ -601,6 +648,8 @@ def main() -> None:
         write_results_board(league)
     elif cmd == "vet":
         cmd_vet(league, sys.argv[3])
+    elif cmd == "calibrate":
+        cmd_calibrate(league)
     elif cmd == "brief":
         print(brief(league))
 

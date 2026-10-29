@@ -15,6 +15,7 @@ from __future__ import annotations
 import json
 import math
 import re
+import urllib.parse
 import urllib.request
 
 SPORT = {"nba": "basketball/nba", "nfl": "football/nfl"}
@@ -36,9 +37,11 @@ LEAGUE_RATE = {
     "3-PT Made": 0.054, "3-PT Attempted": 0.15, "Two Pointers Made": 0.12, "Two Pointers Attempted": 0.22,
     "Free Throws Made": 0.066, "Free Throws Attempted": 0.085, "Pts+Rebs": 0.64, "Pts+Asts": 0.57,
     "Rebs+Asts": 0.29, "Pts+Rebs+Asts": 0.75, "Blks+Stls": 0.045,
+    "Offensive Rebounds": 0.042, "Defensive Rebounds": 0.14,
 }
 
 _cache: dict = {}
+CUTOFF: str | None = None  # ISO date (UTC); when set, games on or after it are ignored (backtests)
 
 
 def _get(url: str) -> dict:
@@ -93,6 +96,53 @@ def _nfl_game(names: list[str], stats: list[str]) -> dict:
     return out
 
 
+BREF = "https://www.basketball-reference.com"
+_last_bref = [0.0]
+
+
+def _bref(path: str) -> str:
+    """Basketball-Reference page (polite: one request every 3.5 s, as the site asks)."""
+    import time
+    url = BREF + path
+    if url not in _cache:
+        wait = 3.5 - (time.time() - _last_bref[0])
+        if wait > 0:
+            time.sleep(wait)
+        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+        _cache[url] = urllib.request.urlopen(req, timeout=30).read().decode("utf-8", "replace")
+        _last_bref[0] = time.time()
+    return _cache[url]
+
+
+def bref_slug(name: str) -> str | None:
+    page = _bref("/search/search.fcgi?search=" + urllib.parse.quote(name))
+    m = re.search(r'/players/[a-z]/([a-z]+\d\d)\.html', page)
+    return m.group(1) if m else None
+
+
+def rebound_games(name: str, season: int) -> list[dict]:
+    """Offensive / defensive rebounds per game from Basketball-Reference (ESPN logs don't split them)."""
+    try:
+        slug = bref_slug(name)
+        if not slug:
+            return []
+        page = _bref(f"/players/{slug[0]}/{slug}/gamelog/{season}")
+    except OSError:
+        return []
+    out = []
+    for row in re.findall(r'<tr id="player_game_log_reg[^"]*"[^>]*>(.*?)</tr>', page, re.S):
+        cell = dict(re.findall(r'data-stat="([a-z_]+)"[^>]*>(?:<a[^>]*>)?([^<]*)', row))
+        if not cell.get("mp"):
+            continue  # did not play
+        mm, _, ss = cell["mp"].partition(":")
+        date = cell.get("date", "")
+        if CUTOFF and date and date >= CUTOFF[:10]:
+            continue
+        out.append({"date": date, "minutes": int(mm) + (int(ss) / 60 if ss else 0),
+                    "Offensive Rebounds": float(cell.get("orb") or 0), "Defensive Rebounds": float(cell.get("drb") or 0)})
+    return out
+
+
 def games(league: str, aid: str, season: int) -> list[dict]:
     """Regular-season games for one season, oldest first."""
     try:
@@ -105,11 +155,13 @@ def games(league: str, aid: str, season: int) -> list[dict]:
     out = []
     for c in reg.get("categories", []):
         for e in c.get("events", []):
-            if league == "nba":
-                out.append(_nba_game(dict(zip(log["labels"], e["stats"]))))
-            else:
-                out.append(_nfl_game(log.get("names", []), e["stats"]))
-    return out[::-1]
+            date = (log.get("events", {}).get(e["eventId"]) or {}).get("gameDate", "")
+            if CUTOFF and date >= CUTOFF:
+                continue  # backtests: only games played before the lean's date
+            g = _nba_game(dict(zip(log["labels"], e["stats"]))) if league == "nba" else _nfl_game(log.get("names", []), e["stats"])
+            g["date"] = date
+            out.append(g)
+    return sorted(out, key=lambda g: g["date"])
 
 
 def _nb_cdf(k: int, mean: float, var: float) -> float:
@@ -129,7 +181,10 @@ def analyze(league: str, lean: dict) -> dict | None:
     if not aid:
         return None
     stat, line, side = lean["stat"], lean.get("current_line", lean["line"]), lean["side"]
-    now, last = (games(league, aid, s) for s in SEASON[league])
+    if league == "nba" and stat in ("Offensive Rebounds", "Defensive Rebounds"):
+        now, last = (rebound_games(lean["player"], s) for s in SEASON[league])
+    else:
+        now, last = (games(league, aid, s) for s in SEASON[league])
     if league == "nba":
         now = [g for g in now if g["minutes"] >= MIN_MINUTES]
         last = [g for g in last if g["minutes"] >= MIN_MINUTES]
@@ -154,7 +209,8 @@ def analyze(league: str, lean: dict) -> dict | None:
             k_min = 0
         rate = (sum(g[stat] * w for g, w in rows) + (prior or 0) * k_min) / (mins + k_min)
         exp_min = _expected_minutes(lean, now or last)
-        lam = rate * exp_min
+        # research can move his rate for tonight (a teammate out, a new role): usage_adj 1.10 = 10% more
+        lam = rate * exp_min * float(lean.get("usage_adj") or 1.0)
         per = [g[stat] / g["minutes"] * exp_min for g, _ in rows]
         disp = max(sum((v - lam) ** 2 for v in per) / max(len(per) - 1, 1) / max(lam, 1e-9), 1.0)
         prob = lambda mean: _side_prob(side, line, mean, exp_min, disp)  # noqa: E731
