@@ -98,8 +98,11 @@ class Handler(BaseHTTPRequestHandler):
 
 def main() -> None:
     threading.Thread(target=scheduler, daemon=True).start()
-    server = ThreadingHTTPServer(("127.0.0.1", PORT), Handler)
-    print(f"Board live at http://127.0.0.1:{PORT}  (Ctrl+C to stop)")
+    # --lan: also reachable from other devices on the home network (phone on the same Wi-Fi)
+    host = "0.0.0.0" if "--lan" in sys.argv else "127.0.0.1"
+    server = ThreadingHTTPServer((host, PORT), Handler)
+    print(f"Board live at http://127.0.0.1:{PORT}" + (" and on your network (see your PC's Wi-Fi IP)" if host != "127.0.0.1" else "")
+          + "  (Ctrl+C to stop)")
     server.serve_forever()
 
 
