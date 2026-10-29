@@ -39,8 +39,10 @@ h2{font-size:15px;margin:0 0 12px;color:var(--muted);font-weight:600;text-transf
 .res.hit{background:var(--more-bg);color:var(--more)}
 .res.miss{background:var(--less-bg);color:var(--less)}
 .res.push,.res.void{background:var(--bg);color:var(--muted);border:1px solid var(--line)}
-.nrow.hitrow{border-color:rgba(34,197,94,.55)}
-.nrow.missrow{border-color:rgba(244,63,94,.4)}
+.nrow.hitrow{background:rgba(34,197,94,.2);border-color:var(--more)}
+.nrow.missrow{background:rgba(244,63,94,.2);border-color:var(--less)}
+.nrow.shortrow{opacity:.7;border-style:dashed}
+.res.short{background:var(--bg);color:#facc15;border:1px solid rgba(250,204,21,.45)}
 .record{font-size:28px;font-weight:800}
 .list{margin:6px 0 0;padding-left:18px;color:var(--muted);font-size:13px}
 .switch{margin-left:auto;color:var(--accent);text-decoration:none;font-weight:600;font-size:14px}
@@ -411,7 +413,10 @@ function renderLeans() {
           ${l.locked ? `<span class="ltype">Game started</span>` : ""}
           ${l.reduced_payout ? `<span class="ltype reduced">Reduced payout</span>` : `<span class="ltype">Full payout</span>`}${newsBadge(l.news)}</div>
         <div class="th">${esc(l.why)}</div>
-        <div class="note" style="margin-top:4px">${l.projection != null ? `Projection ${l.projection} · ` : ""}Research ${l.confidence}% · Track record ${esc(l.track_record || "n/a")}</div>
+        <div class="note" style="margin-top:4px">${l.projection != null ? `Projection ${l.projection} · ` : ""}Research ${l.confidence}% · Track record ${esc(l.track_record || "n/a")}${l.minutes_risk ? ` · Minutes risk <b class="${l.minutes_risk === "high" ? "neg" : l.minutes_risk === "low" ? "pos" : ""}">${esc(l.minutes_risk)}</b>${l.expected_minutes ? ` (${esc(l.expected_minutes)} expected)` : ""}` : ""}</div>
+        ${l.vet_note ? `<div class="note" style="margin-top:2px">Late check: ${esc(l.vet_note)}</div>` : ""}
+        ${l.data ? `<div class="note" style="margin-top:2px">His numbers: ${l.data.stat_prob != null ? `count model ${l.data.stat_prob}% (projects ${l.data.proj} in ${l.data.exp_min} min; ${l.data.stress_prob}% if it runs 15% against him) · ` : ""}beat this line in ${l.data.hit_rate}% of ${l.data.games} games (shrunk) · average ${l.data.avg}</div>` : ""}
+        ${(l.flags || []).length ? `<div class="adjnote">${l.flags.map(esc).join(" · ")}</div>` : ""}
       </div>
       <div class="od"><b class="${conf(l) >= 60 ? "pos" : ""}">${conf(l)}%</b><div>model</div></div>
     </div>`).join("") : `<div class="empty">Research is still running. Leans will appear here.</div>`;
@@ -423,8 +428,17 @@ function renderLeans() {
     Researched ${esc(board.researched_at || "")}.</div>
     ${m ? `<h2 style="margin-top:14px">What the record says (${m.graded} graded)</h2>
       <div class="note">More ${m.side.More} · Less ${m.side.Less}</div>
-      <ul class="list">${m.types.map(t => `<li>${esc(t[0])}: ${t[1]} (model ${t[2]}%)</li>`).join("")}</ul>` : ""}
+      ${modelLists(m)}` : ""}
     ${(board.slate_notes || []).length ? `<h2 style="margin-top:14px">Slate notes</h2><ul class="list">${board.slate_notes.map(n => `<li>${esc(n)}</li>`).join("")}</ul>` : ""}`;
+}
+
+// What the model has learned, one list per feature it keeps a record for
+function modelLists(m) {
+  const sec = (title, rows) => rows && rows.length ? `<h2 style="margin-top:14px">${title}</h2>
+    <ul class="list">${rows.map(t => `<li>${esc(t[0])}: ${t[1]} (model ${t[2]}%)</li>`).join("")}</ul>` : "";
+  return sec("By lean type", m.types) + sec("By cushion (projection vs line)", m.cushion)
+    + sec("By research confidence", m.research) + sec("By payout", m.payout) + sec("By minutes risk", m.minutes_risk)
+    + (m.left_early ? `<div class="note" style="margin-top:8px">${m.left_early} lean(s) not counted: the player left early.</div>` : "");
 }
 
 // ---------------------------------------------------------------- Results
@@ -434,7 +448,7 @@ function renderResults() {
   $("#picks").innerHTML = days.length ? days.map(d => {
     const date = new Date(+d.date.slice(0, 4), +d.date.slice(4, 6) - 1, +d.date.slice(6)).toLocaleDateString([], { weekday: "short", month: "short", day: "numeric" });
     const rows = [...d.leans].sort((a, b) => (a.favorite || 99) - (b.favorite || 99) || (b.model_conf ?? b.confidence) - (a.model_conf ?? a.confidence));
-    return `<div class="lineup"><div class="lh"><b>${esc(date)}</b><span><span class="record">${d.record}</span> hit · favorites ${d.favorites_record}${d.pushes ? ` · ${d.pushes} push` : ""}</span></div></div>
+    return `<div class="lineup"><div class="lh"><b>${esc(date)}</b><span><span class="record">${d.record}</span> hit · favorites ${d.favorites_record}${d.pushes ? ` · ${d.pushes} push` : ""}${d.short ? ` · ${d.short} left early (not counted)` : ""}</span></div></div>
     ${rows.map(l => `<div class="nrow ${l.result}row">
       ${l.photo ? `<img src="${esc(l.photo)}" alt="">` : `<div class="ini">${esc(ini(l.player))}</div>`}
       <div>
@@ -442,14 +456,14 @@ function renderResults() {
           <span class="pick ${l.side}">${l.side} ${l.line} ${esc(l.stat)}</span></div>
         <div class="th">Put up <b style="color:var(--text)">${l.actual ?? "n/a"}</b>${l.minutes ? ` in ${l.minutes} min` : ""} · needed ${l.side === "More" ? "more than" : "less than"} ${l.line}${l.projection != null ? ` · projected ${l.projection}` : ""} · ${l.model_conf ?? l.confidence}%</div>
       </div>
-      <div class="od"><span class="res ${l.result}">${l.result}</span></div>
+      <div class="od"><span class="res ${l.result}">${l.result === "short" ? "Left early" : l.result}</span>${l.result === "short" ? `<div>${esc(l.short_note || "")}<br>would have ${esc(l.would_have || "")}, not counted</div>` : ""}</div>
     </div>`).join("")}`;
   }).join("") : `<div class="empty">No graded days yet. Leans are graded the morning after from the final box scores.</div>`;
   const m = board.model;
   $("#otherNote").hidden = false;
   $("#otherNote").innerHTML = `<b>All-time record</b><div class="record" style="margin:6px 0">${esc(board.overall || "0/0")}</div>
     ${m ? `<div class="note">More ${m.side.More} · Less ${m.side.Less}</div>
-    <h2 style="margin-top:14px">By lean type</h2><ul class="list">${m.types.map(t => `<li>${esc(t[0])}: ${t[1]} (model now rates it ${t[2]}%)</li>`).join("")}</ul>
+    ${modelLists(m)}
     <div class="note" style="margin-top:8px">New leans are scored with these records, so the board leans harder into what has been winning.</div>` : ""}`;
 }
 
