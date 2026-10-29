@@ -358,6 +358,7 @@ def rescore(league: str, refresh_data: bool = False) -> None:
 
 
 MAX_LOW_LINE_FAVORITES = 2  # one-event lines are volatile: keep most favorites on bigger numbers
+FAVORITE_MIN = 55  # never a favorite below the 5-6 pick Flex breakeven area
 
 
 def pick_favorites(doc: dict) -> None:
@@ -370,7 +371,7 @@ def pick_favorites(doc: dict) -> None:
                     key=lambda l: (-l["model_conf"], l["reduced_payout"], -l["confidence"])):
         if n == 6:
             break
-        if norm(l["player"]) in seen or (l.get("low_line") and low >= MAX_LOW_LINE_FAVORITES):
+        if l["model_conf"] < FAVORITE_MIN or norm(l["player"]) in seen or (l.get("low_line") and low >= MAX_LOW_LINE_FAVORITES):
             continue
         seen.add(norm(l["player"]))
         low += bool(l.get("low_line"))
