@@ -181,6 +181,24 @@ NFL_LOW_YARDAGE_CAP = 62
 BREAKEVEN = 54.2  # per-pick hit rate a 5 or 6-pick Flex needs at full payout
 
 
+MARKET_WEIGHT = 0.65
+MARKET_DISAGREE = 12  # points between market and model worth flagging
+
+
+def market_prices(league: str) -> dict:
+    """{(player, stat, line): P(More wins) in %} from the sharp-book board (Pinnacle, Kalshi as backup)."""
+    out = {}
+    for p in (load(ddir(league) / "board.json", {}) or {}).get("props", []):
+        bs = p.get("by_source") or {}
+        pin, kal = bs.get("pinnacle") or {}, bs.get("kalshi") or {}
+        pm = pin.get("p_more") if pin.get("line") == p["line"] else None
+        if pm is None and kal.get("exact") and kal.get("p_more") is not None:
+            pm = kal["p_more"]
+        if pm is not None:
+            out[(norm(p["player"]), p["stat"], p["line"])] = round(100 * pm)
+    return out
+
+
 def low_line(league: str, lean: dict) -> bool:
     """A line one event can decide: NBA counting lines of 2.5 or less."""
     return league == "nba" and lean["line"] <= 2.5
@@ -209,6 +227,10 @@ def score(league: str, lean: dict, m: dict) -> None:
     data = lean.get("data") or {}
     # the player's own numbers: count model for NBA counting stats, else his shrunk hit rate
     data_p = data.get("stat_prob", data.get("hit_rate"))
+    mkt = lean.get("market_p")
+    if mkt is not None and data_p is not None:
+        # sharp price at this exact line: the market leads, the model adjusts (Russell / Unabated)
+        data_p = round(100 / (1 + math.exp(-(MARKET_WEIGHT * logit(mkt / 100) + (1 - MARKET_WEIGHT) * logit(data_p / 100)))))
     lean["record_prob"] = round(record_p)
     if data_p is None:
         conf = (1 - w) * lean["confidence"] + w * record_p
@@ -216,6 +238,7 @@ def score(league: str, lean: dict, m: dict) -> None:
         bl = load(ddir(league) / "blend.json", None) or DATA_BLEND
         conf = bl["research"] * lean["confidence"] + bl["data"] * data_p + bl["record"] * record_p
     conf -= MINUTES_RISK_PENALTY[lean["side"]].get(lean.get("minutes_risk") or "", 0)
+    conf += lean.get("synth_adj") or 0  # cross-check ruling (synthesis agent), -6 to +4
     flags = []
     if data.get("volatility") == "high":
         conf = 50 + (conf - 50) * (1 - VOLATILITY_SHRINK)  # one event decides it: trust every estimate less
@@ -230,6 +253,8 @@ def score(league: str, lean: dict, m: dict) -> None:
         conf = min(conf, NFL_LOW_YARDAGE_CAP)
     if data_p is not None and data_p < 50:
         flags.append(f"his own numbers say {data_p}%")
+    if mkt is not None and abs(mkt - (data.get("stat_prob", data.get("hit_rate")) or mkt)) >= MARKET_DISAGREE:
+        flags.append(f"sharp market says {mkt}%")
     lean["flags"] = flags
     lean["model_conf"] = int(round(min(max(conf, CONF_RANGE[0]), CONF_RANGE[1])))
     lean["low_line"] = low_line(league, lean)
@@ -320,9 +345,12 @@ def rescore(league: str, refresh_data: bool = False) -> None:
     if not doc or not doc.get("leans"):
         return
     m = model(league)
+    mk = market_prices(league)
     for l in doc["leans"]:
         if refresh_data or "data" not in l:
             l["data"] = hitrate.analyze(league, l)
+        more = mk.get((norm(l["player"]), l["stat"], l.get("current_line")))
+        l["market_p"] = None if more is None else (more if l["side"] == "More" else 100 - more)
         score(league, l, m)
     pick_favorites(doc)
     doc["model"] = model_summary(league, m)
@@ -338,7 +366,7 @@ def pick_favorites(doc: dict) -> None:
         l.pop("favorite", None)
     seen = set()
     n = low = 0
-    for l in sorted((l for l in doc["leans"] if not l.get("cut")),
+    for l in sorted((l for l in doc["leans"] if not l.get("cut") and l.get("current_line") is not None),
                     key=lambda l: (-l["model_conf"], l["reduced_payout"], -l["confidence"])):
         if n == 6:
             break
@@ -590,6 +618,34 @@ CALIBRATE_MIN = 150
 VERIFIED_CONFIDENCE = 58
 
 
+def cmd_synth(path: str) -> None:
+    """Apply the synthesis agent's cross-check: drops, small score adjustments, and standing patterns."""
+    doc = json.loads(Path(path).read_text(encoding="utf-8"))
+    for league in SPORT:
+        bpath = ddir(league) / "board_leans.json"
+        board = load(bpath, None)
+        if not board:
+            continue
+        for c in doc.get("calls", []):
+            if c.get("league", league) != league:
+                continue
+            for l in board["leans"]:
+                if norm(l["player"]) == norm(c["player"]) and l["stat"] == c["stat"] and l["side"] == c["side"]:
+                    if (c.get("verdict") or "").lower() == "drop":
+                        l["cut"] = True
+                    l["synth_adj"] = max(-6, min(4, int(c.get("adjust") or 0)))
+                    l["synth_note"] = c.get("why")
+        board["patterns"] = [p["rule"] for p in doc.get("patterns", [])]
+        board["correlated"] = doc.get("correlated", [])
+        save(bpath, board)
+        rescore(league)
+    pats = ROOT / "data" / "patterns.json"
+    old = load(pats, [])
+    seen = {o["rule"] for o in old}
+    save(pats, old + [{"date": today(), **p} for p in doc.get("patterns", []) if p["rule"] not in seen])
+    print(f"applied {len(doc.get('calls', []))} calls, {len(doc.get('patterns', []))} patterns")
+
+
 # Standing research rules. The record-based lessons are added from the history each time.
 RESEARCH_RULES = """- Project every lean from per-minute (or per-snap) rate x expected minutes tonight, then adjust for
   injuries and usage, pace and total, the opponent's allowance for that stat, refs, rest and the spread.
@@ -629,11 +685,18 @@ def brief(league: str) -> str:
     if shorts:
         lines.append("- Ruined by leaving early: " + "; ".join(f"{h['player']} ({h.get('short_note', '')})" for h in shorts)
                      + ". Check minutes risk on every lean.")
+    learned = load(ROOT / "data" / "patterns.json", [])
+    if learned:
+        lines.append("- Standing patterns found by cross-checking agents: "
+                     + " ".join(f"({p['date']}) {p['rule']}" for p in learned[-12:]))
     return "\n".join(lines) + "\n\nRules:\n" + RESEARCH_RULES
 
 
 def main() -> None:
     cmd, league = sys.argv[1], sys.argv[2]
+    if cmd == "synth":
+        cmd_synth(sys.argv[2])
+        return
     if cmd == "new":
         cmd_new(league)
     elif cmd == "add":

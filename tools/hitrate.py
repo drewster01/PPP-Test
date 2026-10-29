@@ -15,13 +15,19 @@ from __future__ import annotations
 import json
 import math
 import re
+import sys
+from pathlib import Path
 import urllib.parse
 import urllib.request
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import nbastats  # noqa: E402
+from scipy.stats import nbinom, poisson  # noqa: E402
 
 SPORT = {"nba": "basketball/nba", "nfl": "football/nfl"}
 SEASON = {"nba": (2027, 2026), "nfl": (2026, 2025)}  # ESPN season ids: this season, last season
 MIN_MINUTES = 15
-THIS_SEASON_WEIGHT = 2.0
+THIS_SEASON_WEIGHT = 3.0  # backtest 10/29: 3x beat 1x and 2x on both seasons
 # Small samples: a player's per-minute rate is shrunk toward the league rate as if he had also played
 # PRIOR_MINUTES at it, and his hit rate toward 50% as if he had PRIOR_GAMES more games split evenly.
 PRIOR_MINUTES = 120  # volume stats (shots, points, rebounds) are stable per player: light prior
@@ -166,29 +172,50 @@ def games(league: str, aid: str, season: int) -> list[dict]:
 
 def _nb_cdf(k: int, mean: float, var: float) -> float:
     """P(X <= k) for a negative binomial with this mean and variance (Poisson if var <= mean)."""
-    if mean <= 0:
-        return 1.0
+    if mean <= 0 or k < 0:
+        return 1.0 if k >= 0 else 0.0
     if var <= mean * 1.02:
-        return sum(math.exp(-mean) * mean ** i / math.factorial(i) for i in range(k + 1))
+        return float(poisson.cdf(k, mean))
     r = mean * mean / (var - mean)
-    p = r / (r + mean)
-    return sum(math.exp(math.lgamma(i + r) - math.lgamma(r) - math.lgamma(i + 1) + r * math.log(p) + i * math.log(1 - p))
-               for i in range(k + 1))
+    return float(nbinom.cdf(k, r, r / (r + mean)))
 
 
 def analyze(league: str, lean: dict) -> dict | None:
     aid = athlete_id(lean.get("photo"))
-    if not aid:
+    if not aid and league != "nba":
         return None
-    stat, line, side = lean["stat"], lean.get("current_line", lean["line"]), lean["side"]
-    if league == "nba" and stat in ("Offensive Rebounds", "Defensive Rebounds"):
-        now, last = (rebound_games(lean["player"], s) for s in SEASON[league])
-    else:
-        now, last = (games(league, aid, s) for s in SEASON[league])
+    stat, line, side = lean["stat"], (lean["line"] if lean.get("current_line") is None else lean["current_line"]), lean["side"]
+    now = last = None
+    if league == "nba":
+        logs = [nbastats.game_logs(s) for s in SEASON[league]]
+        if all(lg is not None for lg in logs):
+            now, last = (lg.get(nbastats.norm(lean["player"]), []) for lg in logs)
+            now = [g for g in now if not CUTOFF or g["date"] < CUTOFF]
+    if now is None:
+        if league == "nba" and stat in ("Offensive Rebounds", "Defensive Rebounds"):
+            now, last = (rebound_games(lean["player"], s) for s in SEASON[league])
+        else:
+            now, last = (games(league, aid, s) for s in SEASON[league])
+    return model_from_games(league, lean, now, last)
+
+
+def model_from_games(league: str, lean: dict, now: list[dict], last: list[dict]) -> dict | None:
+    """The model on given game histories (oldest first). Backtests call this with past games only."""
+    stat, line, side = lean["stat"], (lean["line"] if lean.get("current_line") is None else lean["current_line"]), lean["side"]
     if league == "nba":
         now = [g for g in now if g["minutes"] >= MIN_MINUTES]
         last = [g for g in last if g["minutes"] >= MIN_MINUTES]
-    rows = [(g, THIS_SEASON_WEIGHT) for g in now if stat in g] + [(g, 1.0) for g in last if stat in g]
+    now = [g for g in now if stat in g]
+    last = [g for g in last if stat in g]
+    n_now = len(now)
+    w_now = [0.5 ** ((n_now - 1 - i) / HALF_LIFE_GAMES) * THIS_SEASON_WEIGHT for i in range(n_now)]
+    w_last = [0.5 ** ((len(last) - 1 - i) / HALF_LIFE_GAMES) * 0.5 + 0.5 for i in range(len(last))]
+    role = (role_change(now, last) or rate_shift(now, last, stat)) if league == "nba" else None
+    if role and last and now:
+        cap = ROLE_CHANGE_LAST_SHARE / (1 - ROLE_CHANGE_LAST_SHARE) * sum(w_now)
+        scale = min(1.0, cap / sum(w_last))
+        w_last = [w * scale for w in w_last]
+    rows = list(zip(now, w_now)) + list(zip(last, w_last))
     if len(rows) < 2:
         return None
     win = lambda v: v > line if side == "More" else v < line  # noqa: E731
@@ -200,6 +227,8 @@ def analyze(league: str, lean: dict) -> dict | None:
     sd = math.sqrt(sum((v - mean) ** 2 for v in vals) / max(len(vals) - 1, 1))
     out = {"hit_rate": round(hit_rate * 100), "games": len(rows), "games_now": len(now),
            "avg": round(mean, 1), "sd": round(sd, 1)}
+    if role:
+        out["role_change"] = role
     # count model (NBA): per-minute rate (this season weighted double, shrunk toward the league rate)
     # x tonight's minutes, as a negative binomial averaged over a spread of minutes
     if league == "nba":
@@ -210,12 +239,18 @@ def analyze(league: str, lean: dict) -> dict | None:
         rate = (sum(g[stat] * w for g, w in rows) + (prior or 0) * k_min) / (mins + k_min)
         exp_min = _expected_minutes(lean, now or last)
         # research can move his rate for tonight (a teammate out, a new role): usage_adj 1.10 = 10% more
-        lam = rate * exp_min * float(lean.get("usage_adj") or 1.0)
+        mf = matchup_factor(lean.get("opp"), stat)
+        lam = rate * exp_min * float(lean.get("usage_adj") or 1.0) * mf
+        if mf != 1.0:
+            out["matchup"] = round(mf, 3)
         per = [g[stat] / g["minutes"] * exp_min for g, _ in rows]
         disp = max(sum((v - lam) ** 2 for v in per) / max(len(per) - 1, 1) / max(lam, 1e-9), 1.0)
-        prob = lambda mean: _side_prob(side, line, mean, exp_min, disp)  # noqa: E731
+        p_blow = blowout_prob(lean.get("team"))
+        out["blowout"] = round(p_blow * 100)
+        prob = lambda mean: _side_prob(side, line, mean, exp_min, disp, p_blow)  # noqa: E731
         bad = 1.15 if side == "Less" else 0.85  # one-event stress test: the mean moves 15% against the lean
-        out.update(stat_prob=round(100 * prob(lam)), stress_prob=round(100 * prob(lam * bad)),
+        cal = lambda q: 0.5 + CALIBRATION * (q - 0.5)  # noqa: E731  (backtest: raw chances run a bit hot)
+        out.update(stat_prob=round(100 * cal(prob(lam))), stress_prob=round(100 * cal(prob(lam * bad))),
                    exp_min=round(exp_min), proj=round(lam, 1))
     # volatility: one event decides it when the line is near zero next to the spread
     z = abs(line - mean) / max(sd, 0.5)
@@ -223,10 +258,14 @@ def analyze(league: str, lean: dict) -> dict | None:
     return out
 
 
-def _side_prob(side: str, line: float, lam: float, exp_min: float, disp: float) -> float:
-    """Chance the lean wins (pushes refunded), averaged over minutes exp_min +/- MINUTES_SD."""
+def _side_prob(side: str, line: float, lam: float, exp_min: float, disp: float, p_blow: float = 0.0) -> float:
+    """Chance the lean wins (pushes refunded), averaged over a minutes mixture: a normal game
+    (minutes +/- MINUTES_SD) and, with chance p_blow, a blowout where rotation players sit late."""
     total = 0.0
-    for dm, w in ((-MINUTES_SD, 0.25), (0.0, 0.5), (MINUTES_SD, 0.25)):
+    cut = BLOWOUT_MINUTES_CUT if exp_min >= 24 else 0.0
+    draws = [(dm, w * (1 - p_blow)) for dm, w in ((-MINUTES_SD, 0.25), (0.0, 0.5), (MINUTES_SD, 0.25))]
+    draws.append((-cut, p_blow))
+    for dm, w in draws:
         mean = max(lam * (exp_min + dm) / exp_min, 0.01)
         var = mean * disp
         if float(line).is_integer():
@@ -238,6 +277,86 @@ def _side_prob(side: str, line: float, lam: float, exp_min: float, disp: float) 
             p_more = 1 - p_less
         total += w * (p_more if side == "More" else p_less)
     return total
+
+
+HALF_LIFE_GAMES = 25
+CALIBRATION = 0.9  # backtest 10/29: 0.85-0.9 scored best on all three samples
+ROLE_CHANGE_LAST_SHARE = 0.40
+BLOWOUT_MARGIN = 15
+MARGIN_SD = 12.5
+BLOWOUT_MINUTES_CUT = 8.0
+MATCHUP_REGRESS = 0.5  # opponent factors are noisy: use half of each
+MATCHUPS = Path(__file__).resolve().parent.parent / "data" / "nba" / "matchups.json"
+# PrizePicks stat -> opponent factor key (factors are keyed by the defending team)
+MATCHUP_KEY = {
+    "Points": "pts", "Rebounds": "reb", "Assists": "ast", "Steals": "stl", "Blocked Shots": "blk",
+    "Turnovers": "tov", "Offensive Rebounds": "oreb", "Defensive Rebounds": "dreb",
+    "FG Made": "fga", "FG Attempted": "fga", "3-PT Made": "fg3a", "3-PT Attempted": "fg3a",
+    "Two Pointers Made": "fg2a", "Two Pointers Attempted": "fg2a", "Free Throws Made": "fta",
+    "Free Throws Attempted": "fta", "Pts+Rebs": ("pts", "reb"), "Pts+Asts": ("pts", "ast"),
+    "Rebs+Asts": ("reb", "ast"), "Pts+Rebs+Asts": ("pts", "reb", "ast"), "Blks+Stls": ("blk", "stl"),
+}
+
+
+def _matchups() -> dict:
+    if "matchups" not in _cache:
+        try:
+            _cache["matchups"] = json.loads(MATCHUPS.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            _cache["matchups"] = {}
+    return _cache["matchups"]
+
+
+def matchup_factor(opp: str | None, stat: str) -> float:
+    team = (_matchups().get("teams") or {}).get(opp or "")
+    key = MATCHUP_KEY.get(stat)
+    if not team or not key:
+        return 1.0
+    keys = key if isinstance(key, tuple) else (key,)
+    vals = [float(team[k]) for k in keys if isinstance(team.get(k), (int, float))]
+    if not vals:
+        return 1.0
+    return 1 + MATCHUP_REGRESS * (sum(vals) / len(vals) - 1)
+
+
+def blowout_prob(team: str | None) -> float:
+    """P(final margin >= BLOWOUT_MARGIN either way), margin ~ Normal(spread, MARGIN_SD)."""
+    for name, g in (_matchups().get("games") or {}).items():
+        if team and team in name.split("@"):
+            m = re.search(r"([A-Z]{2,3})\s*([-+]\d+(?:\.\d+)?)", str(g.get("spread", "")))
+            if not m:
+                return 0.0
+            fav_margin = -float(m.group(2))  # "POR -7.5": POR expected to win by 7.5
+            cdf = lambda x: 0.5 * (1 + math.erf((x - fav_margin) / (MARGIN_SD * math.sqrt(2))))  # noqa: E731
+            return (1 - cdf(BLOWOUT_MARGIN)) + cdf(-BLOWOUT_MARGIN)
+    return 0.0
+
+
+RATE_SHIFT = 0.25  # this season's per-minute rate 25%+ away from last season's
+RATE_SHIFT_MIN_GAMES = 8  # fewer games: too noisy (backtest), research sets usage_adj instead
+
+
+def rate_shift(now: list[dict], last: list[dict], stat: str) -> str | None:
+    if len(now) < RATE_SHIFT_MIN_GAMES or not last:
+        return None
+    r_now = sum(g[stat] for g in now) / max(sum(g["minutes"] for g in now), 1)
+    r_last = sum(g[stat] for g in last) / max(sum(g["minutes"] for g in last), 1)
+    if r_last > 0 and abs(r_now / r_last - 1) >= RATE_SHIFT:
+        return f"{stat} per minute {'up' if r_now > r_last else 'down'} {abs(r_now / r_last - 1):.0%} from last season"
+    return None
+
+
+def role_change(now: list[dict], last: list[dict]) -> str | None:
+    """Why last season's numbers may not describe him now: new team or minutes moved 6+."""
+    if not now or not last:
+        return None
+    if now[-1].get("team") and last[-1].get("team") and now[-1]["team"] != last[-1]["team"]:
+        return f"new team ({last[-1]['team']} to {now[-1]['team']})"
+    m_now = sum(g["minutes"] for g in now) / len(now)
+    m_last = sum(g["minutes"] for g in last) / len(last)
+    if abs(m_now - m_last) >= 6:
+        return f"minutes {m_last:.0f} last season, {m_now:.0f} now"
+    return None
 
 
 def _expected_minutes(lean: dict, recent: list[dict]) -> float:
