@@ -207,6 +207,8 @@ def model_from_games(league: str, lean: dict, now: list[dict], last: list[dict])
         last = [g for g in last if g["minutes"] >= MIN_MINUTES]
     now = [g for g in now if stat in g]
     last = [g for g in last if stat in g]
+    if league == "nfl" and len(now) >= NFL_CURRENT_ONLY:
+        last = []  # NFL roles shift week to week: once he has 5 games, this season only (synthesis rule 10)
     n_now = len(now)
     w_now = [0.5 ** ((n_now - 1 - i) / HALF_LIFE_GAMES) * THIS_SEASON_WEIGHT for i in range(n_now)]
     w_last = [0.5 ** ((len(last) - 1 - i) / HALF_LIFE_GAMES) * 0.5 + 0.5 for i in range(len(last))]
@@ -280,6 +282,7 @@ def _side_prob(side: str, line: float, lam: float, exp_min: float, disp: float, 
 
 
 HALF_LIFE_GAMES = 25
+NFL_CURRENT_ONLY = 5
 CALIBRATION = 0.9  # backtest 10/29: 0.85-0.9 scored best on all three samples
 ROLE_CHANGE_LAST_SHARE = 0.40
 BLOWOUT_MARGIN = 15

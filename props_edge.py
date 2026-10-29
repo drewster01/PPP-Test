@@ -355,12 +355,31 @@ def main(argv: list[str] | None = None) -> int:
         try:
             ld = json.loads(leans_path.read_text(encoding="utf-8"))
             live = {(names.norm_name(p.player), p.stat_type): p for p in plays_props if p.odds_type == "standard"}
+            # sharp no-vig chance the More wins at PrizePicks' exact line, for closing line value (CLV)
+            sharp = {}
+            for pp in priced:
+                bs = getattr(pp, "by_source", None) or {}
+                pin, kal = bs.get("pinnacle") or {}, bs.get("kalshi") or {}
+                pm = pin.get("p_more") if pin.get("line") == pp.prop.line else None
+                if pm is None and kal.get("exact"):
+                    pm = kal.get("p_more")
+                if pm is not None:
+                    sharp[(names.norm_name(pp.prop.player), pp.prop.stat_type, pp.prop.line)] = pm
             now = tracking.now()
             for l in ld.get("leans", []):
                 cur = live.get((names.norm_name(l["player"]), l["stat"]))
                 if cur is None and l.get("start") and datetime.fromisoformat(l["start"]) <= now:
+                    if not l.get("locked") and l.get("market_now") is not None:
+                        l["market_close"] = l["market_now"]  # last sharp price before the game = the close
                     l["locked"] = True  # game started: PrizePicks drops the line, keep the last one
                     continue
+                if cur and l.get("current_line") not in (None, cur.line):
+                    # every PrizePicks move is logged: pulls and moves show where informed money went
+                    l.setdefault("line_moves", []).append({"at": now.isoformat(), "from": l["current_line"], "to": cur.line})
+                pm = sharp.get((names.norm_name(l["player"]), l["stat"], cur.line)) if cur else None
+                if pm is not None:
+                    l["market_now"] = round(100 * (pm if l["side"] == "More" else 1 - pm), 1)
+                    l.setdefault("market_open", l["market_now"])
                 l["current_line"] = cur.line if cur else None
                 l["reduced_payout"] = bool(cur and cur.adjusted)
                 if cur:

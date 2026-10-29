@@ -181,6 +181,12 @@ NFL_LOW_YARDAGE_CAP = 62
 BREAKEVEN = 54.2  # per-pick hit rate a 5 or 6-pick Flex needs at full payout
 
 
+def breakeven(reduced: bool) -> float:
+    """Per-leg hit rate a 6-pick Flex needs (54.2% at full payout); reduced legs pay ~12% less."""
+    return BREAKEVEN / (REDUCED_FACTOR if reduced else 1.0)
+
+
+REDUCED_FACTOR = (15 / 25) ** (1 / 4)  # same as ppedge.config.ADJUSTED_LEG_FACTOR
 MARKET_WEIGHT = 0.65
 MARKET_DISAGREE = 12  # points between market and model worth flagging
 
@@ -257,6 +263,8 @@ def score(league: str, lean: dict, m: dict) -> None:
         flags.append(f"sharp market says {mkt}%")
     lean["flags"] = flags
     lean["model_conf"] = int(round(min(max(conf, CONF_RANGE[0]), CONF_RANGE[1])))
+    lean["need"] = round(breakeven(lean.get("reduced_payout")), 1)
+    lean["edge"] = round(lean["model_conf"] - lean["need"], 1)
     lean["low_line"] = low_line(league, lean)
     lean["lean_type"] = FEATURES["type"](league, lean)
     lean["track_record"] = (" · ".join(notes) or "no record yet") + f" (all {lean['side']} {s['hits']}/{s['n']})"
@@ -368,10 +376,10 @@ def pick_favorites(doc: dict) -> None:
     seen = set()
     n = low = 0
     for l in sorted((l for l in doc["leans"] if not l.get("cut") and l.get("current_line") is not None),
-                    key=lambda l: (-l["model_conf"], l["reduced_payout"], -l["confidence"])):
+                    key=lambda l: (-l.get("edge", -99), -l["model_conf"])):
         if n == 6:
             break
-        if l["model_conf"] < FAVORITE_MIN or norm(l["player"]) in seen or (l.get("low_line") and low >= MAX_LOW_LINE_FAVORITES):
+        if l.get("edge", -1) <= 0 or l["model_conf"] < FAVORITE_MIN or norm(l["player"]) in seen or (l.get("low_line") and low >= MAX_LOW_LINE_FAVORITES):
             continue
         seen.add(norm(l["player"]))
         low += bool(l.get("low_line"))
