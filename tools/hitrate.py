@@ -208,7 +208,7 @@ def model_from_games(league: str, lean: dict, now: list[dict], last: list[dict])
         last = [g for g in last if g["minutes"] >= MIN_MINUTES]
     now = [g for g in now if stat in g]
     last = [g for g in last if stat in g]
-    if league in ("nfl", "cfb") and len(now) >= NFL_CURRENT_ONLY:
+    if league in ("nfl", "cfb") and len(now) >= (NFL_CURRENT_ONLY if league == "nfl" else CFB_CURRENT_ONLY):
         last = []  # NFL roles shift week to week: once he has 5 games, this season only (synthesis rule 10)
     n_now = len(now)
     w_now = [0.5 ** ((n_now - 1 - i) / HALF_LIFE_GAMES) * THIS_SEASON_WEIGHT for i in range(n_now)]
@@ -308,6 +308,7 @@ MAKES_FROM_ATTEMPTS = True
 MAKES = {"3-PT Made": ("3-PT Attempted", 0.36, 300), "FG Made": ("FG Attempted", 0.47, 250),
          "Two Pointers Made": ("Two Pointers Attempted", 0.54, 250), "Free Throws Made": ("Free Throws Attempted", 0.78, 150)}
 NFL_CURRENT_ONLY = 8  # TLT backtest 10/30: 8 beat 5 on both seeds and both player halves
+CFB_CURRENT_ONLY = 5  # college rosters and roles turn over yearly (transfers, freshmen): last season misleads
 CALIBRATION = 0.9  # backtest 10/29: 0.85-0.9 scored best on all three samples
 ROLE_CHANGE_LAST_SHARE = 0.40
 BLOWOUT_MARGIN = 15
