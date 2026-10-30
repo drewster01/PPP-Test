@@ -204,6 +204,8 @@ def market_prices(league: str) -> dict:
         bs = p.get("by_source") or {}
         pin, kal = bs.get("pinnacle") or {}, bs.get("kalshi") or {}
         pm = pin.get("p_more") if pin.get("line") == p["line"] else None
+        if pm is not None and pin.get("over") == pin.get("under"):
+            pm = None  # identical prices both ways (often -114/-114 in college) are a placeholder, not a read
         if pm is None and kal.get("exact") and kal.get("p_more") is not None:
             pm = kal["p_more"]
         if pm is not None:
@@ -252,6 +254,7 @@ def score(league: str, lean: dict, m: dict) -> None:
         conf = bl["research"] * lean["confidence"] + bl["data"] * data_p + bl["record"] * record_p
     conf -= MINUTES_RISK_PENALTY[lean["side"]].get(lean.get("minutes_risk") or "", 0)
     conf += lean.get("synth_adj") or 0  # cross-check ruling (synthesis agent), -6 to +4
+    conf -= lean.get("injury_penalty") or 0  # unresolved injury news the lean depends on (injury_check.py)
     flags = []
     if data.get("volatility") == "high":
         conf = 50 + (conf - 50) * (1 - VOLATILITY_SHRINK)  # one event decides it: trust every estimate less
@@ -373,7 +376,7 @@ def rescore(league: str, refresh_data: bool = False) -> None:
 
 
 MAX_LOW_LINE_FAVORITES = 2  # one-event lines are volatile: keep most favorites on bigger numbers
-FAVORITE_MIN = 55  # never a favorite below the 5-6 pick Flex breakeven area
+FAVORITE_MIN = 60  # graded 10/28-29: model 60%+ went 8/11, under 60% went 18/35
 
 
 def pick_favorites(doc: dict) -> None:

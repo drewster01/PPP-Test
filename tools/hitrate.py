@@ -25,7 +25,7 @@ import nbastats  # noqa: E402
 from scipy.stats import nbinom, poisson  # noqa: E402
 
 SPORT = {"nba": "basketball/nba", "nfl": "football/nfl", "cfb": "football/college-football"}
-SEASON = {"nba": (2027, 2026), "nfl": (2026, 2025)}  # ESPN season ids: this season, last season
+SEASON = {"nba": (2027, 2026), "nfl": (2026, 2025), "cfb": (2026, 2025)}  # ESPN season ids: this season, last season
 MIN_MINUTES = 15
 THIS_SEASON_WEIGHT = 3.0  # backtest 10/29: 3x beat 1x and 2x on both seasons
 # Small samples: a player's per-minute rate is shrunk toward the league rate as if he had also played
@@ -239,6 +239,17 @@ def model_from_games(league: str, lean: dict, now: list[dict], last: list[dict])
         if prior is None:
             k_min = 0
         rate = (sum(g[stat] * w for g, w in rows) + (prior or 0) * k_min) / (mins + k_min)
+        mk = MAKES.get(stat) if MAKES_FROM_ATTEMPTS else None
+        if mk and all(mk[0] in g for g, _ in rows):
+            # made shots = attempt rate x shooting %, the % shrunk hard toward the league: a cold or hot
+            # start moves attempts a little and makes a lot, and only the attempts are a stable skill
+            att_stat, league_pct, k_att = mk
+            att_prior = LEAGUE_RATE.get(att_stat, 0)
+            att_w = sum(g[att_stat] * w for g, w in rows)
+            att_rate = (att_w + att_prior * PRIOR_MINUTES) / (mins + PRIOR_MINUTES)
+            pct = (sum(g[stat] * w for g, w in rows) + league_pct * k_att) / (att_w + k_att)
+            rate = att_rate * pct
+            out["shooting_pct"] = round(pct, 3)
         exp_min = _expected_minutes(lean, now or last)
         # research can move his rate for tonight (a teammate out, a new role): usage_adj 1.10 = 10% more
         mf = matchup_factor(lean.get("opp"), stat)
@@ -285,6 +296,10 @@ def _side_prob(side: str, line: float, lam: float, exp_min: float, disp: float, 
 
 
 HALF_LIFE_GAMES = 25
+MAKES_FROM_ATTEMPTS = True
+# made stat -> (attempt stat, league make %, prior attempts the % is shrunk with)
+MAKES = {"3-PT Made": ("3-PT Attempted", 0.36, 300), "FG Made": ("FG Attempted", 0.47, 250),
+         "Two Pointers Made": ("Two Pointers Attempted", 0.54, 250), "Free Throws Made": ("Free Throws Attempted", 0.78, 150)}
 NFL_CURRENT_ONLY = 5
 CALIBRATION = 0.9  # backtest 10/29: 0.85-0.9 scored best on all three samples
 ROLE_CHANGE_LAST_SHARE = 0.40
