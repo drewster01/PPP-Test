@@ -15,7 +15,7 @@ from pathlib import Path
 from zoneinfo import ZoneInfo
 
 ROOT = Path(__file__).resolve().parent.parent
-LEAGUES = ("nba", "nfl")
+LEAGUES = ("nba", "nfl", "cfb")
 FILES = ("board.json", "board_leans.json", "board_results.json")
 # card fields the page never reads on the Picks tab; dropping them keeps the snapshot small
 DROP = ("devig_range", "quotes", "dist", "books", "comparison")

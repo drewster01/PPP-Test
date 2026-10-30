@@ -12,7 +12,7 @@ from .fetch import DATA_DIR
 from .names import norm_name, short_key
 
 CACHE = DATA_DIR / "headshots.json"
-SPORT_PATH = {"nfl": "football/nfl", "nba": "basketball/nba"}[config.LEAGUE]
+SPORT_PATH = {"nfl": "football/nfl", "nba": "basketball/nba", "cfb": "football/college-football"}[config.LEAGUE]
 URL = "https://site.api.espn.com/apis/site/v2/sports/" + SPORT_PATH + "/teams/{}/roster"
 # PrizePicks abbreviation -> ESPN's, where they differ
 ESPN_ABBR = {"GSW": "gs", "NOP": "no", "NYK": "ny", "SAS": "sa", "UTA": "utah", "WAS": "wsh"}

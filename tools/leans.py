@@ -32,7 +32,7 @@ import hitrate  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
 ET = ZoneInfo("America/New_York")
-SPORT = {"nba": "basketball/nba", "nfl": "football/nfl"}
+SPORT = {"nba": "basketball/nba", "nfl": "football/nfl", "cfb": "football/college-football"}
 
 # How much one lean type's record moves its confidence. Records are shrunk toward the side's
 # record (prior weight GROUP_PRIOR), and the side's record toward 50% (SIDE_PRIOR), so a handful
@@ -262,7 +262,7 @@ def score(league: str, lean: dict, m: dict) -> None:
         if stressed is not None and stressed < need:
             conf = min(conf, 52)
             flags.append(f"fails the one-event test ({stressed}% if his average runs 15% against it; needs {need}%)")
-    if league == "nfl" and lean["side"] == "Less" and group(league, lean["stat"], lean["line"]) in ("yards", "longest play"):
+    if league in ("nfl", "cfb") and lean["side"] == "Less" and group(league, lean["stat"], lean["line"]) in ("yards", "longest play"):
         conf = min(conf, NFL_LOW_YARDAGE_CAP)
     if data_p is not None and data_p < 50:
         flags.append(f"his own numbers say {data_p}%")
@@ -461,7 +461,7 @@ def box_scores(league: str, date: str) -> dict:
         if ev["status"]["type"]["name"] != "STATUS_FINAL":
             continue
         summ = get(f"{base}/summary?event={ev['id']}")
-        if league == "nfl":
+        if league in ("nfl", "cfb"):
             out.update(nfl_rows(summ))
             continue
         for team in summ["boxscore"]["players"]:

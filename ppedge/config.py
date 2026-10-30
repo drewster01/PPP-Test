@@ -26,7 +26,7 @@ SGO_PARAMS = {
     "limit": "10",
 }
 PP_URL = "https://partner-api.prizepicks.com/projections"
-PP_PARAMS = {"league_id": {"nfl": "9", "nba": "7"}[LEAGUE], "per_page": "500", "single_stat": "true"}
+PP_PARAMS = {"league_id": {"nfl": "9", "nba": "7", "cfb": "15"}[LEAGUE], "per_page": "500", "single_stat": "true"}
 BROWSER_UA = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
     "(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36"
@@ -40,6 +40,8 @@ CACHE_MAX_AGE_MIN = 10  # reuse raw files younger than this unless --refresh
 # --------------------------------------------------------------------------
 # Whole slate: every team on today's PrizePicks board (both leagues)
 GAME_TEAMS = None
+# CFB plays mostly on Saturday: its slate covers today and tomorrow
+SLATE_DAYS = 2 if LEAGUE == "cfb" else 1
 TEAM_ALIASES = {}
 GAME_LABEL = f"{LEAGUE.upper()} slate"
 
@@ -284,7 +286,7 @@ PORTFOLIO_MAX_EXPOSURE = 0.5
 # --------------------------------------------------------------------------
 # Live board
 # --------------------------------------------------------------------------
-BANKROLL = 337.50
+BANKROLL = 98.00  # user, 2026-10-29
 UNIT = 10.00  # user's standard entry size
 # refresh until the end of today's slate (US Eastern); overwritten at runtime
 # with the last start time once the board is parsed

@@ -51,6 +51,11 @@ if config.LEAGUE == "nba":
                       "Steals": "stl", "Blocks": "blk"}
 
 
+if config.LEAGUE == "cfb":
+    KALSHI_SERIES = {}  # Kalshi lists no college player props
+    PINNACLE_NFL = 880  # NCAA football league id on the guest feed
+
+
 def _slate_date_code() -> str:
     """Kalshi event-ticker date code for today's slate in US Eastern, e.g. 26OCT21."""
     from zoneinfo import ZoneInfo
@@ -175,7 +180,7 @@ def fetch_pinnacle(log) -> dict | None:
         # whole slate: every game starting within the next 18 hours
         now = datetime.now(timezone.utc)
         games = [m for m in matchups if m.get("type") == "matchup" and m.get("startTime")
-                 and 0 <= (datetime.fromisoformat(m["startTime"].replace("Z", "+00:00")) - now).total_seconds() < 18 * 3600]
+                 and 0 <= (datetime.fromisoformat(m["startTime"].replace("Z", "+00:00")) - now).total_seconds() < (18 + 24 * (config.SLATE_DAYS - 1)) * 3600]
         if not games:
             log("Pinnacle: no games on today's slate.")
             return None

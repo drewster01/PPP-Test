@@ -39,7 +39,8 @@ def _tonight(start: str | None) -> bool:
     from datetime import datetime
     from zoneinfo import ZoneInfo
     et = ZoneInfo("America/New_York")
-    return datetime.fromisoformat(start).astimezone(et).date() == datetime.now(et).date()
+    days = (datetime.fromisoformat(start).astimezone(et).date() - datetime.now(et).date()).days
+    return 0 <= days < config.SLATE_DAYS
 
 
 def parse(pp: dict, log, keep_types=("standard",)) -> tuple[list[PPProp], dict]:

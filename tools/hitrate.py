@@ -24,7 +24,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import nbastats  # noqa: E402
 from scipy.stats import nbinom, poisson  # noqa: E402
 
-SPORT = {"nba": "basketball/nba", "nfl": "football/nfl"}
+SPORT = {"nba": "basketball/nba", "nfl": "football/nfl", "cfb": "football/college-football"}
 SEASON = {"nba": (2027, 2026), "nfl": (2026, 2025)}  # ESPN season ids: this season, last season
 MIN_MINUTES = 15
 THIS_SEASON_WEIGHT = 3.0  # backtest 10/29: 3x beat 1x and 2x on both seasons
@@ -207,7 +207,7 @@ def model_from_games(league: str, lean: dict, now: list[dict], last: list[dict])
         last = [g for g in last if g["minutes"] >= MIN_MINUTES]
     now = [g for g in now if stat in g]
     last = [g for g in last if stat in g]
-    if league == "nfl" and len(now) >= NFL_CURRENT_ONLY:
+    if league in ("nfl", "cfb") and len(now) >= NFL_CURRENT_ONLY:
         last = []  # NFL roles shift week to week: once he has 5 games, this season only (synthesis rule 10)
     n_now = len(now)
     w_now = [0.5 ** ((n_now - 1 - i) / HALF_LIFE_GAMES) * THIS_SEASON_WEIGHT for i in range(n_now)]

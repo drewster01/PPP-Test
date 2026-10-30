@@ -64,7 +64,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--trials", type=int, default=config.SIM_TRIALS)
     ap.add_argument("--clv", action="store_true")
     ap.add_argument("--grade", action="store_true")
-    ap.add_argument("--league", choices=["nfl", "nba"], default=config.LEAGUE)
+    ap.add_argument("--league", choices=["nfl", "nba", "cfb"], default=config.LEAGUE)
     args = ap.parse_args(argv)
     nba = config.LEAGUE == "nba"
 

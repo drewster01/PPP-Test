@@ -23,7 +23,7 @@ from zoneinfo import ZoneInfo
 ROOT = Path(__file__).resolve().parent
 INDEX = ROOT / "web" / "index.html"
 DATA = ROOT / "data"
-LEAGUES = ("nba", "nfl")
+LEAGUES = ("nba", "nfl", "cfb")
 PAGES = ("picks", "leans", "results")
 PORT = 8766
 REFRESH_MIN = 10
