@@ -170,6 +170,8 @@ footer{max-width:1300px;margin:0 auto;padding:0 20px 30px;color:var(--dim);font-
 
 <script>
 const $ = s => document.querySelector(s);
+// initials for players with no headshot (college players usually have none)
+const ini = n => String(n || "").split(" ").filter(w => !/^(jr|sr|ii|iii|iv).?$/i.test(w)).map(w => w[0]).slice(0, 2).join("");
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const odds = a => (a > 0 ? "+" : "") + a;
 const usd = v => "$" + v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -220,7 +222,7 @@ function render() {
   $("#sub").innerHTML = `<span>${esc(board.game)}</span>${board.kickoff ? `<span>${ms > 0 ? `${LEAGUE_PATH === "nba" ? "First tip in" : "Kickoff in"} ${Math.floor(ms / 3600000)}h ${Math.floor(ms / 60000) % 60}m` : "Games started"}</span>` : ""}<span>Updated ${t(board.generated_at)}</span>`;
 
   const when = iso => iso ? new Date(iso).toLocaleString([], { weekday: "short", hour: "numeric", minute: "2-digit" }).replace(" AM", "am").replace(" PM", "pm") : "";
-  const ini = n => n.split(" ").filter(w => !/^(jr|sr|ii|iii|iv)\.?$/i.test(w)).map(w => w[0]).slice(0, 2).join("");
+  // (initials helper is defined at the top)
   // rank by value after PrizePicks' reduced payout on adjusted lines
   if (PLATFORM === "leans") { renderLeans(); return; }
   if (PLATFORM === "results") { renderResults(); return; }
