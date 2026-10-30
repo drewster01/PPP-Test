@@ -101,3 +101,30 @@ def tracking(season: int) -> dict[str, dict] | None:
         out.setdefault(norm(r["PLAYER_NAME"]), {}).update(usage=r.get("USG_PCT"), minutes=r.get("MIN"))
     _mem[("trk", season)] = out or None
     return _mem[("trk", season)]
+
+
+def defense_factors(season: int) -> dict[str, dict[str, float]]:
+    """{team: {stat: what opponents get against this team per game / league average}} from the logs."""
+    if ("def", season) in _mem:
+        return _mem[("def", season)]
+    logs = game_logs(season) or {}
+    per_game: dict[tuple, dict] = {}  # (date, offense team, defense team) -> stat totals
+    for games in logs.values():
+        for g in games:
+            m = g.get("matchup") or ""
+            opp = m.replace("@", "vs.").split("vs.")[-1].strip()
+            key = (g["date"], g.get("team"), opp)
+            tot = per_game.setdefault(key, {})
+            for k, v in g.items():
+                if isinstance(v, (int, float)) and k not in ("minutes",):
+                    tot[k] = tot.get(k, 0) + v
+    allowed: dict[str, dict[str, list]] = {}
+    league: dict[str, list] = {}
+    for (_, _, defense), tot in per_game.items():
+        for k, v in tot.items():
+            allowed.setdefault(defense, {}).setdefault(k, []).append(v)
+            league.setdefault(k, []).append(v)
+    avg = {k: sum(v) / len(v) for k, v in league.items() if v}
+    out = {t: {k: (sum(v) / len(v)) / avg[k] for k, v in st.items() if avg.get(k)} for t, st in allowed.items()}
+    _mem[("def", season)] = out
+    return out

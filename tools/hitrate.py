@@ -218,6 +218,8 @@ def model_from_games(league: str, lean: dict, now: list[dict], last: list[dict])
         scale = min(1.0, cap / sum(w_last))
         w_last = [w * scale for w in w_last]
     rows = list(zip(now, w_now)) + list(zip(last, w_last))
+    if league == "nba" and SOS_ADJUST:
+        rows = [(_sos(g, stat), w) for g, w in rows]
     if len(rows) < 2:
         return None
     win = lambda v: v > line if side == "More" else v < line  # noqa: E731
@@ -367,6 +369,22 @@ def rate_shift(now: list[dict], last: list[dict], stat: str) -> str | None:
     if r_last > 0 and abs(r_now / r_last - 1) >= RATE_SHIFT:
         return f"{stat} per minute {'up' if r_now > r_last else 'down'} {abs(r_now / r_last - 1):.0%} from last season"
     return None
+
+
+SOS_ADJUST = True
+SOS_REGRESS = 0.5  # use half of each past opponent's defensive factor (team factors are noisy)
+
+
+def _sos(g: dict, stat: str) -> dict:
+    """The game restated against an average defense: his number divided by how much that night's
+    opponent usually gives up of this stat (strength of schedule, Popovich 10/30)."""
+    season = 2027 if g.get("date", "") >= "2026-10-01" else 2026
+    opp = (g.get("matchup") or "").replace("@", "vs.").split("vs.")[-1].strip()
+    f = (nbastats.defense_factors(season).get(opp) or {}).get(stat)
+    if not f or stat not in g:
+        return g
+    f = 1 + SOS_REGRESS * (min(max(f, 0.8), 1.25) - 1)
+    return {**g, stat: g[stat] / f}
 
 
 def role_change(now: list[dict], last: list[dict]) -> str | None:
