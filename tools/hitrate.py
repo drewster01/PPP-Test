@@ -327,8 +327,10 @@ def matchup_factor(opp: str | None, stat: str) -> float:
 
 def blowout_prob(team: str | None) -> float:
     """P(final margin >= BLOWOUT_MARGIN either way), margin ~ Normal(spread, MARGIN_SD)."""
+    alias = {"WAS": "WSH", "WSH": "WAS", "GSW": "GS", "GS": "GSW", "NYK": "NY", "NY": "NYK",
+             "NOP": "NO", "NO": "NOP", "SAS": "SA", "SA": "SAS", "UTA": "UTAH", "UTAH": "UTA"}
     for name, g in (_matchups().get("games") or {}).items():
-        if team and team in name.split("@"):
+        if team and (team in name.split("@") or alias.get(team) in name.split("@")):
             m = re.search(r"([A-Z]{2,3})\s*([-+]\d+(?:\.\d+)?)", str(g.get("spread", "")))
             if not m:
                 return 0.0
