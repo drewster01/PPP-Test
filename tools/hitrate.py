@@ -166,6 +166,7 @@ def games(league: str, aid: str, season: int) -> list[dict]:
                 continue  # backtests: only games played before the lean's date
             g = _nba_game(dict(zip(log["labels"], e["stats"]))) if league == "nba" else _nfl_game(log.get("names", []), e["stats"])
             g["date"] = date
+            g["opp"] = ((log.get("events", {}).get(e["eventId"]) or {}).get("opponent") or {}).get("abbreviation")
             out.append(g)
     return sorted(out, key=lambda g: g["date"])
 
@@ -220,6 +221,8 @@ def model_from_games(league: str, lean: dict, now: list[dict], last: list[dict])
     rows = list(zip(now, w_now)) + list(zip(last, w_last))
     if league == "nba" and SOS_ADJUST:
         rows = [(_sos(g, stat), w) for g, w in rows]
+    elif league in ("nfl", "cfb") and SOS_ADJUST:
+        rows = _football_sos(league, lean, stat, rows)
     if len(rows) < 2:
         return None
     win = lambda v: v > line if side == "More" else v < line  # noqa: E731
@@ -385,6 +388,34 @@ def _sos(g: dict, stat: str) -> dict:
         return g
     f = 1 + SOS_REGRESS * (min(max(f, 0.8), 1.25) - 1)
     return {**g, stat: g[stat] / f}
+
+
+# PrizePicks team abbreviation -> ESPN's, where they differ (college)
+PP_TO_ESPN = {"SCAR": "SC", "IND": "IU", "MIZZ": "MIZ", "BSU": "BOIS", "UGA": "UGA", "OKLA": "OU",
+              "WASH": "WASH", "FRES": "FRES", "TXST": "TXST", "CHAR": "CLT", "KENT": "KENT", "SAC": "SAC",
+              "KU": "KU", "NW": "NU", "UVA": "UVA", "WAKE": "WAKE", "MINN": "MINN", "RUTG": "RUTG", "MICH": "MICH"}
+
+
+def _football_sos(league: str, lean: dict, stat: str, rows: list) -> list:
+    """Restate each past game against an average defense, then apply tonight's defense (half strength)."""
+    import defense
+    fam = defense.FAMILY.get(stat)
+    table = defense.factors(league) if fam else {}
+    if not table:
+        return rows
+    reg = lambda f: 1 + SOS_REGRESS * (min(max(f, 0.6), 1.6) - 1)  # noqa: E731
+    opp = lean.get("opp") or ""
+    tonight = (table.get(PP_TO_ESPN.get(opp, opp)) or {}).get(fam)
+    t = reg(tonight) if tonight else 1.0
+    out = []
+    for g, w in rows:
+        f = (table.get(g.get("opp") or "") or {}).get(fam)
+        if f and stat in g:
+            g = {**g, stat: g[stat] / reg(f) * t}
+        elif stat in g and t != 1.0:
+            g = {**g, stat: g[stat] * t}
+        out.append((g, w))
+    return out
 
 
 def role_change(now: list[dict], last: list[dict]) -> str | None:
