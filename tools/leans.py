@@ -676,7 +676,15 @@ RESEARCH_RULES = """- Project every lean from per-minute (or per-snap) rate x ex
   must still be 58%+ if his average runs 15% against it. Prefer bigger lines with real cushion.
 - NFL Unders on low yardage or longest-play lines are capped at 62%: one long play decides them.
 - A player's own per-minute numbers over this season and last (minutes-weighted, small samples shrunk
-  toward the league) outweigh a hot 3-5 game stretch."""
+  toward the league) outweigh a hot 3-5 game stretch.
+- Lessons from 10/29 (all four losing slip legs were turned by news after entry):
+  * A lean that depends on a minutes split (backup big, rotation) must name the teammate it depends on;
+    if that teammate is questionable or a rest candidate, flag it. Clingan blocks lost when R. Williams rested.
+  * Unders on a player whose team is missing several players at his position are traps (Achiuwa DREB
+    with four Kings bigs out). Check the depth chart, not just his own status.
+  * NFL: a backup RB or TE being inactive concentrates touches (Dillon out sank Hubbard halves Under).
+  * A PrizePicks line moving against our side before the game is a real warning (McDuffie 7.5 moved up).
+  * Final picks are made after the 6 PM ET injury report and NFL inactives, not earlier."""
 
 
 def brief(league: str) -> str:
