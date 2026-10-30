@@ -229,6 +229,8 @@ def model_from_games(league: str, lean: dict, now: list[dict], last: list[dict])
     decided = [(g, w) for g, w in rows if g[stat] != line]
     wins, total = sum(w for g, w in decided if win(g[stat])), sum(w for _, w in decided)
     hit_rate = (wins + PRIOR_GAMES * 0.5) / (total + PRIOR_GAMES)
+    if league in ("nfl", "cfb"):
+        hit_rate = 0.5 + FOOTBALL_CALIBRATION * (hit_rate - 0.5)
     vals = [g[stat] for g, _ in rows]
     mean = sum(vals) / len(vals)
     sd = math.sqrt(sum((v - mean) ** 2 for v in vals) / max(len(vals) - 1, 1))
@@ -305,7 +307,7 @@ MAKES_FROM_ATTEMPTS = True
 # made stat -> (attempt stat, league make %, prior attempts the % is shrunk with)
 MAKES = {"3-PT Made": ("3-PT Attempted", 0.36, 300), "FG Made": ("FG Attempted", 0.47, 250),
          "Two Pointers Made": ("Two Pointers Attempted", 0.54, 250), "Free Throws Made": ("Free Throws Attempted", 0.78, 150)}
-NFL_CURRENT_ONLY = 5
+NFL_CURRENT_ONLY = 8  # TLT backtest 10/30: 8 beat 5 on both seeds and both player halves
 CALIBRATION = 0.9  # backtest 10/29: 0.85-0.9 scored best on all three samples
 ROLE_CHANGE_LAST_SHARE = 0.40
 BLOWOUT_MARGIN = 15
@@ -396,16 +398,24 @@ PP_TO_ESPN = {"SCAR": "SC", "IND": "IU", "MIZZ": "MIZ", "BSU": "BOIS", "UGA": "U
               "KU": "KU", "NW": "NU", "UVA": "UVA", "WAKE": "WAKE", "MINN": "MINN", "RUTG": "RUTG", "MICH": "MICH"}
 
 
+# TLT backtest 10/30: schedule adjustment helped pass stats on both seeds and hurt rush stats on both
+FOOTBALL_SOS_FAMILIES = {"pass"}
+FOOTBALL_CALIBRATION = 0.85  # football chances above 75% hit about 71%: pull them toward 50%
+
+
 def _football_sos(league: str, lean: dict, stat: str, rows: list) -> list:
     """Restate each past game against an average defense, then apply tonight's defense (half strength)."""
     import defense
     fam = defense.FAMILY.get(stat)
+    if fam not in FOOTBALL_SOS_FAMILIES:
+        return rows
     table = defense.factors(league) if fam else {}
     if not table:
         return rows
     reg = lambda f: 1 + SOS_REGRESS * (min(max(f, 0.6), 1.6) - 1)  # noqa: E731
     opp = lean.get("opp") or ""
-    tonight = (table.get(PP_TO_ESPN.get(opp, opp)) or {}).get(fam)
+    alias = PP_TO_ESPN if league == "cfb" else {}  # NFL abbreviations already match ESPN (IND = Colts)
+    tonight = (table.get(alias.get(opp, opp)) or {}).get(fam)
     t = reg(tonight) if tonight else 1.0
     out = []
     for g, w in rows:
