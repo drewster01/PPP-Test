@@ -505,10 +505,11 @@ def cmd_grade(league: str, date: str) -> None:
     box = box_scores(league, date)
     graded = []
     for l in leans:
-        # only leans that were on the PrizePicks board at start time count
-        if l.get("current_line") is None or l.get("cut"):
+        # every lean that was added (it was live then) counts unless it was cut; if the feed lost the line
+        # before the game, grade it at the last line we saw
+        if l.get("cut"):
             continue
-        line = l["current_line"]
+        line = l["current_line"] if l.get("current_line") is not None else l["line"]
         row = box.get(norm(l["player"]))
         g = {k: l.get(k) for k in ("player", "team", "opp", "stat", "side", "confidence", "model_conf", "favorite",
                                    "reduced_payout", "photo", "why", "pass", "projection", "minutes_risk",
